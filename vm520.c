@@ -103,6 +103,60 @@ opcodes[] =
 //////////////////////////////////////////////////////////////////////
 // implementation of the public interface to the VM
 
+/*
+ * loadObjectFileXPVM
+ *
+ * Loads an object file for the XPVM
+ *
+ *  only one object file may be loaded at a time
+ *  the function returns 1 if successful and 0 otherwise
+ *  if 0 is returned then an error number is returned through the second
+ *    parameter if it is not NULL
+ *  the following error numbers are supported:
+ *    -1: file not found
+ *    -2: file contains outsymbols
+ *    -3: file is not a valid object file
+ */
+int loadObjectFileXPVM( char *filename, int *errorNumber )
+{
+  FILE *fp;
+  unsigned int blockCount = 0;
+  const unsigned int MAGIC = 0x31303636;
+  unsigned int magic = 0;
+  int i = 0;
+
+  /* Open the file */
+  fp = fopen( filename, "r" );
+  if( NULL == fp )
+  {
+    *errorNumber = -1;
+    return 0;
+  }
+
+  /* read headers */
+  if( !readWord( fp, (int*) &magic ) )
+  {
+    *errorNumber = -3;
+    return 0;
+  }
+  if( MAGIC != magic )
+  {
+    *errorNumber = -3;
+    return 0;
+  }
+  if( !readWord( fp, (int *) &blockCount ) )
+  {
+    *errorNumber = -3;
+    return 0;
+  }
+
+#if DEBUG_XPVM
+  fprintf("blockCount: %d\n", blockCount );
+#endif
+
+  return 0;
+}
+
 // load an object file
 //   only one object file may be loaded at a time
 //   the function returns 1 if successful and 0 otherwise
@@ -442,6 +496,9 @@ int disassemble(unsigned int address, char *buffer, int *errorNumber)
 //   read a word from the object file
 //   returns word through the second parameter
 //   returns 0 if EOF detected
+//
+//   Reads in 32 bits from a file and stores them into an integer,
+//   reversing Endianess in the process. {JP}
 static int readWord(FILE *fp, int *outWord)
 {
   int c1 = getc(fp);

@@ -1,0 +1,9 @@
+# .gitignore
+
+# executables
+pi
+sumVector
+
+# object files
+*.o
+*.obj
