@@ -31,6 +31,7 @@
 //     VM520_FILE_IS_NOT_VALID
 //
 int loadObjectFile(char *filename, int *errorNumber);
+int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber );
 
 // get the address of a symbol in the current object file
 //   the label must be a symbol in the insymbol section of the object file

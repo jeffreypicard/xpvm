@@ -30,6 +30,8 @@ sumVector.obj: sumVector.asm
 pi.obj: pi.asm
 	$(AS520) pi.asm
 
+inst_disassemble:
+
 clean:
-	-rm -f sumVector.o pi.o vm520.o sumVector pi sumVector.obj pi.obj
+	-rm -f sumVector.o pi.o vm520.o sumVector pi sumVector.obj pi.obj inst_disassemble
 

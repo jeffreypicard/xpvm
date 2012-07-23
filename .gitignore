@@ -3,6 +3,7 @@
 # executables
 pi
 sumVector
+inst_disassemble
 
 # object files
 *.o

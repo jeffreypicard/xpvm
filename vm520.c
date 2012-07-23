@@ -13,6 +13,9 @@
 #include <unistd.h>
 #include <pthread.h>
 
+/* 32bit types */
+#include <stdint.h>
+
 #include "vm520.h"
 
 #define MEMORY_SIZE 1048576
@@ -22,6 +25,7 @@
 static int readWord(FILE *fp, int *outWord);
 static int readSymbol(FILE *fp, char **outSymbol, unsigned int *outAddr);
 static int readObjectCode(FILE *fp, int *memory, int length);
+static int getObjLength( FILE *, uint32_t, uint64_t *);
 static void cleanupInsymbols(void);
 static void *fetchExecute(void *);
 static int format1(unsigned int, int, int[]);
@@ -32,6 +36,9 @@ static int format5(unsigned int, int, int[]);
 static int format6(unsigned int, int, int[]);
 static int format7(unsigned int, int, int[]);
 static int format8(unsigned int, int, int[]);
+static int32_t format1XPVM( uint32_t, uint32_t, uint64_t *);
+static int32_t format2XPVM( uint32_t, uint32_t, uint64_t *);
+static int32_t format3XPVM( uint32_t, uint32_t, uint64_t *);
 
 // linked list to keep track of (symbol,address) pairs for insymbols
 static struct insymbol {
@@ -42,6 +49,7 @@ static struct insymbol {
 
 // the VM memory
 static int memory[MEMORY_SIZE];
+static int64_t memoryXPVM[MEMORY_SIZE];
 
 // mutex to control access to output log to stderr
 static pthread_mutex_t muTrace;
@@ -57,6 +65,7 @@ static int doTrace = 0;
 
 // record number of processors in use
 static unsigned int numberOfProcessors = 0;
+
 
 // array used to decode opcodes
 //   contains:
@@ -100,6 +109,165 @@ opcodes[] =
 {"pop",     3, format3}, // 25
 };
 
+#define MAX_OPCODE_XPVM 150
+static struct opcodeInfoXPVM
+{
+   char* opcode;
+   int format;
+   int (*formatFunc)(unsigned int procID, uint32_t inst, uint64_t *reg);
+}
+opcodesXPVM[] =
+{
+{"0",         0, NULL},        /* 0 */
+{"1",         0, NULL},        /* 1 */
+{"ldb",       1, format1XPVM}, /* 2 */
+{"ldb",       2, format2XPVM}, /* 3 */
+{"lds",       1, format1XPVM}, /* 4 */
+{"lds",       2, format2XPVM}, /* 5 */
+{"ldi",       1, format1XPVM}, /* 6 */
+{"ldi",       2, format2XPVM}, /* 7 */
+{"ldl",       1, format1XPVM}, /* 8 */
+{"ldl",       2, format2XPVM}, /* 9 */
+{"ldf",       1, format1XPVM}, /* 10 */
+{"ldf",       2, format2XPVM}, /* 11 */
+{"ldd",       1, format1XPVM}, /* 12 */
+{"ldd",       2, format2XPVM}, /* 13 */
+{"ldimm",     3, format3XPVM}, /* 14 */
+{"ldimm2",    3, format3XPVM}, /* 15 */
+{"stb",       1, format1XPVM}, /* 16 */
+{"stb",       2, format2XPVM}, /* 17 */
+{"sts",       1, format1XPVM}, /* 18 */
+{"sts",       2, format2XPVM}, /* 19 */
+{"sti",       1, format1XPVM}, /* 20 */
+{"sti",       2, format2XPVM}, /* 21 */
+{"stl",       1, format1XPVM}, /* 22 */
+{"stl",       2, format2XPVM}, /* 23 */
+{"stf",       1, format1XPVM}, /* 24 */
+{"stf",       2, format2XPVM}, /* 25 */
+{"std",       1, format1XPVM}, /* 26 */
+{"std",       2, format2XPVM}, /* 27 */
+{"28",        0, NULL},        /* 28 */
+{"29",        0, NULL},        /* 29 */
+{"30",        0, NULL},        /* 30 */
+{"31",        0, NULL},        /* 31 */
+{"addl",      1, format1XPVM}, /* 32 */
+{"addl",      2, format2XPVM}, /* 33 */
+{"subl",      1, format1XPVM}, /* 34 */
+{"subl",      2, format2XPVM}, /* 35 */
+{"mull",      1, format1XPVM}, /* 36 */
+{"mull",      2, format2XPVM}, /* 37 */
+{"divl",      1, format1XPVM}, /* 38 */
+{"divl",      2, format2XPVM}, /* 39 */
+{"reml",      1, format1XPVM}, /* 40 */
+{"reml",      2, format2XPVM}, /* 41 */
+{"negl",      1, format1XPVM}, /* 42 */
+{"addd",      1, format1XPVM}, /* 43 */
+{"subd",      1, format1XPVM}, /* 44 */
+{"muld",      1, format1XPVM}, /* 45 */
+{"divd",      1, format1XPVM}, /* 46 */
+{"negd",      1, format2XPVM}, /* 47 */
+{"cvtld",     1, format1XPVM}, /* 48 */
+{"cvtdl",     1, format1XPVM}, /* 49 */
+{"lshift",    1, format1XPVM}, /* 50 */
+{"lshift",    2, format2XPVM}, /* 51 */
+{"rshift",    1, format1XPVM}, /* 52 */
+{"rshift",    2, format2XPVM}, /* 53 */
+{"rshiftu",   1, format1XPVM}, /* 54 */
+{"rshiftu",   2, format2XPVM}, /* 55 */
+{"and",       1, format1XPVM}, /* 56 */
+{"or",        1, format1XPVM}, /* 57 */
+{"xor",       1, format1XPVM}, /* 58 */
+{"ornot",     1, format1XPVM}, /* 59 */
+{"60",        0, NULL},        /* 60 */
+{"61",        0, NULL},        /* 61 */
+{"62",        0, NULL},        /* 62 */
+{"63",        0, NULL},        /* 63 */
+{"cmpeq",     1, format1XPVM}, /* 64 */
+{"cmpeq",     2, format2XPVM}, /* 65 */
+{"cmple",     1, format1XPVM}, /* 66 */
+{"cmple",     2, format2XPVM}, /* 67 */
+{"cmplt",     1, format1XPVM}, /* 68 */
+{"cmplt",     2, format2XPVM}, /* 69 */
+{"cmpule",    1, format1XPVM}, /* 70 */
+{"cmpule",    2, format2XPVM}, /* 71 */
+{"cmpult",    1, format1XPVM}, /* 72 */
+{"cmpult",    2, format2XPVM}, /* 73 */
+{"fcmpeq",    1, format1XPVM}, /* 74 */
+{"fcmple",    1, format1XPVM}, /* 75 */
+{"fcmplt",    1, format1XPVM}, /* 76 */
+{"77",        0, NULL},        /* 77 */
+{"78",        0, NULL},        /* 78 */
+{"79",        0, NULL},        /* 79 */
+{"jmp",       3, format3XPVM}, /* 80 */
+{"jmp",       1, format1XPVM}, /* 81 */
+{"btrue",     3, format3XPVM}, /* 82 */
+{"bfalse",    3, format3XPVM}, /* 83 */
+{"84",        0, NULL},        /* 84 */
+{"85",        0, NULL},        /* 85 */
+{"86",        0, NULL},        /* 86 */
+{"87",        0, NULL},        /* 87 */
+{"88",        0, NULL},        /* 88 */
+{"89",        0, NULL},        /* 89 */
+{"90",        0, NULL},        /* 90 */
+{"91",        0, NULL},        /* 91 */
+{"92",        0, NULL},        /* 92 */
+{"93",        0, NULL},        /* 93 */
+{"94",        0, NULL},        /* 94 */
+{"95",        0, NULL},        /* 95 */
+{"malloc",    1, format1XPVM}, /* 96 */
+{"mmexa",     1, format1XPVM}, /* 97 */
+{"mmexa",     2, format2XPVM}, /* 98 */
+{"atraits",   1, format1XPVM}, /* 99 */
+{"dtraits",   1, format1XPVM}, /* 100 */
+{"rannots",   1, format1XPVM}, /* 101 */
+{"towner",    1, format1XPVM}, /* 102 */
+{"lock",      1, format1XPVM}, /* 103 */
+{"unlock",    1, format1XPVM}, /* 104 */
+{"wait",      1, format1XPVM}, /* 105 */
+{"sig",       1, format1XPVM}, /* 106 */
+{"sigall",    1, format1XPVM}, /* 107 */
+{"108",       0, NULL},        /* 108 */
+{"109",       0, NULL},        /* 109 */
+{"110",       0, NULL},        /* 110 */
+{"111",       0, NULL},        /* 111 */
+{"ldfunc",    3, format3XPVM}, /* 112 */
+{"ldfunc",    1, format1XPVM}, /* 113 */
+{"call",      2, format2XPVM}, /* 114 */
+{"calln",     2, format2XPVM}, /* 115 */
+{"ret",       1, format1XPVM}, /* 116 */
+{"117",       0, NULL},        /* 117 */
+{"118",       0, NULL},        /* 118 */
+{"119",       0, NULL},        /* 119 */
+{"120",       0, NULL},        /* 120 */
+{"121",       0, NULL},        /* 121 */
+{"122",       0, NULL},        /* 122 */
+{"123",       0, NULL},        /* 123 */
+{"124",       0, NULL},        /* 124 */
+{"125",       0, NULL},        /* 125 */
+{"126",       0, NULL},        /* 126 */
+{"127",       0, NULL},        /* 127 */
+{"throw",     1, format1XPVM}, /* 128 */
+{"retrieve",  1, format1XPVM}, /* 129 */
+{"130",       0, NULL},        /* 130 */
+{"131",       0, NULL},        /* 131 */
+{"132",       0, NULL},        /* 132 */
+{"133",       0, NULL},        /* 133 */
+{"134",       0, NULL},        /* 134 */
+{"135",       0, NULL},        /* 135 */
+{"136",       0, NULL},        /* 136 */
+{"137",       0, NULL},        /* 137 */
+{"138",       0, NULL},        /* 138 */
+{"139",       0, NULL},        /* 139 */
+{"140",       0, NULL},        /* 140 */
+{"141",       0, NULL},        /* 141 */
+{"142",       0, NULL},        /* 142 */
+{"143",       0, NULL},        /* 143 */
+{"initProc",  2, format2XPVM}, /* 144 */
+{"join",      1, format1XPVM}, /* 145 */
+{"join2",     1, format1XPVM}, /* 146 */
+{"whoami",    1, format1XPVM}, /* 147 */
+};
+
 //////////////////////////////////////////////////////////////////////
 // implementation of the public interface to the VM
 
@@ -117,12 +285,13 @@ opcodes[] =
  *    -2: file contains outsymbols
  *    -3: file is not a valid object file
  */
-int loadObjectFileXPVM( char *filename, int *errorNumber )
+int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
 {
   FILE *fp;
-  unsigned int blockCount = 0;
-  const unsigned int MAGIC = 0x31303636;
-  unsigned int magic = 0;
+  uint32_t blockCount = 0;
+  uint64_t objLength = 0;
+  const uint32_t MAGIC = 0x31303636;
+  uint32_t magic = 0;
   int i = 0;
 
   /* Open the file */
@@ -154,7 +323,66 @@ int loadObjectFileXPVM( char *filename, int *errorNumber )
   fprintf("blockCount: %d\n", blockCount );
 #endif
 
-  return 0;
+  /* 
+   * Get the length of the object file 
+   * and do a sanity check on the format 
+   */
+  if( !getObjLength( fp, blockCount, &objLength ) )
+  {
+    *errorNumber = -3;
+    return 0;
+  }
+
+  /*
+  // read the object code into memory
+  if (!readObjectCode(fp, memory, objLength))
+  {
+    *errorNumber = -3;
+    return 0;
+  }
+  */
+
+  return 1;
+}
+
+/*
+ * getObjLength
+ *
+ * Gets the length of the object file in bytes.
+ * Takes a file pointer, a 32 bit block count and a
+ * pointer to a 64 bit int for returning the length in
+ * bytes.
+ * Returns 1 on success, 0 if the object file is malformed
+ * (The number of blocks is not what was indicated in the file header).
+ * FIXME: Should this function also check to make sure there are no
+ * out symbol references?
+ * Used for the XPVM.
+ */
+static int getObjLength( FILE *fp, uint32_t blockCount, uint64_t *objLength )
+{
+  fpos_t *fp_pos = NULL;
+  uint32_t cur_length = 0;
+  int i = 0;
+
+  /* Save the current position in the file. */
+  if( 0 > fgetpos( fp, fp_pos ) )
+    return 0;
+
+  *objLength = 0;
+  for( i = 0; i < blockCount; i++ )
+  {
+    if( !readWord( fp, (int*) &cur_length ) )
+      return 0;
+    if( 0 > fseek( fp, cur_length-1, SEEK_CUR ) )
+      return 0;
+    *objLength += cur_length;
+  }
+
+  /* Return the file reading to its original position */
+  if( !fsetpos( fp, fp_pos ) )
+    return 0;
+
+  return 1;
 }
 
 // load an object file
@@ -698,6 +926,219 @@ static void *fetchExecute(void *v)
   }
   
   // won't reach here
+  return 0;
+}
+
+/*
+ * fetchExecuteXPVM
+ *
+ * XPVM version of the fetch/execute function
+ *
+ */
+/* 256 registers per processor */
+#define NUM_REGS 256
+static void *fetchExecuteXPVM(void *v)
+{
+  int i;
+
+  // the processor ID is passed in
+  int processorID = (int) v;
+
+  // the registers
+  // int reg[16];
+  uint64_t reg[NUM_REGS];
+  for (i = 0; i < NUM_REGS; i += 1)
+    reg[i] = 0;
+  SP = initialSP[processorID];
+
+  // fetch/execute cycle
+  while (1)
+  {
+    // check to see if the PC is in range
+    if ((PC < 0) || (PC >= MAX_ADDRESS))
+    {
+      return (void *) VM520_ADDRESS_OUT_OF_RANGE;
+    }
+
+    // print to the trace if tracing turned on
+    if (doTrace)
+    {
+      // lock the trace mutex
+      if (pthread_mutex_lock(&muTrace) != 0)
+      {
+        fprintf(stderr, "procID %d: pthread_mutex_lock failed for trace!\n",
+          processorID);
+        exit(-1);
+      }
+
+      // display the registers
+      /*
+      fprintf(stderr, "<%d>: %08x %08x %08x %08x %08x %08x %08x %08x\n",
+        processorID,
+        reg[0], reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]);
+      fprintf(stderr, "<%d>: %08x %08x %08x %08x %08x %08x %08x %08x\n",
+        processorID,
+        reg[8], reg[9], reg[10], reg[11], reg[12], reg[13], reg[14], reg[15]);
+      */
+
+      // disassemble the next instruction to be executed
+      char buffer[100];
+      int errNum;
+      int ret = disassemble(reg[15], buffer, &errNum);
+      if (ret == 0)
+      {
+        fprintf(stderr,
+          "procID %d: disassemble failed (%d) for fetchExecute!\n",
+          processorID, errNum);
+        exit(-1);
+      }
+      fprintf(stderr, "<%d>: %s\n", processorID, buffer); 
+
+      // unlock the trace mutex
+      if (pthread_mutex_unlock(&muTrace) != 0)
+      {
+        fprintf(stderr, "procID %d: pthread_mutex_unlock failed for trace!\n",
+          processorID);
+        exit(-1);
+      }
+    }
+
+    // fetch
+    //int word = memory[PC];
+    uint32_t word = memory[PC];
+
+    // update PC
+    PC += 1;
+
+    // execute
+    //unsigned char opcode = word & 0xFF;
+    uint32_t opcode = (word & 0xFF000000) >> 24;
+    if (opcode > MAX_OPCODE) // illegal instruction
+    {
+      return  (void *) VM520_ILLEGAL_INSTRUCTION;
+    }
+    int32_t ret = opcodesXPVM[opcode].formatFunc(processorID, word, reg);
+    if (ret <= 0)
+    {
+      return (void *) ret;
+    }
+    else if (ret != 1)
+    {
+      fprintf(stderr,
+        "procID %d: unexpected return value from formatFunc!\n",
+        processorID);
+      exit(-1);
+    }
+  }
+  
+  // won't reach here
+  return 0;
+}
+
+/************* format functions *****************
+ *
+ * The format functions for the XPVM take three arguments each.
+ * The first argument sepcifies the processor ID, the second
+ * are the 32 bits that specify the instruction, this will need
+ * to be taken apart by the format function and how this will be
+ * done shall depend on the format of which there are three.
+ * The last argument will be an array of 64 bit registers.
+ *
+ */
+
+static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
+{
+  uint8_t opcode = (inst & 0xFF000000) >> 24;
+  uint8_t ri     = (inst & 0x00FF0000) >> 16;
+  uint8_t rj     =  (inst & 0x0000FF00) >> 8;
+  uint8_t rk     = (inst & 0x000000FF);
+  int64_t abs_addr = 0;
+
+  switch( opcode )
+  {
+    case 0x02: /* ldb */
+    case 0x04: /* lds */
+    case 0x06: /* ldi */
+    case 0x08: /* ldl */
+    case 0x0A: /* ldf */
+    case 0x0C: /* ldd */
+      abs_addr = reg[rj]+reg[rk];
+      if( abs_addr < 0 || abs_addr >= MAX_ADDRESS )
+        return VM520_ADDRESS_OUT_OF_RANGE;
+      reg[ri] = memoryXPVM[ abs_addr ];
+      break;
+    case 0x10: /* sdb */
+    case 0x12: /* sds */
+    case 0x14: /* sdi */
+    case 0x16: /* sdl */
+    case 0x18: /* sdf */
+    case 0x1A: /* sdd */
+      abs_addr = reg[rj]+reg[rk];
+      if( abs_addr < 0 || abs_addr >= MAX_ADDRESS )
+        return VM520_ADDRESS_OUT_OF_RANGE;
+      memoryXPVM[ abs_addr ] = reg[ ri ];
+      break;
+    case 0x20: /* addl */
+      reg[ri] = (long)reg[rj] + (long)reg[rk];
+      break;
+    case 0x22: /* subl */
+      reg[ri] = (long)reg[rj] - (long)reg[rk];
+      break;
+    case 0x24: /* mull */
+      reg[ri] = (long)reg[rj] * (long)reg[rk];
+      break;
+    case 0x26: /* divl */
+      reg[ri] = (long)reg[rj] / (long)reg[rk];
+      break;
+    case 0x28: /* reml */
+      reg[ri] = (long)reg[rj] % (long)reg[rk];
+      break;
+    case 0x2A: /* negl */
+      reg[ri] = -(long)reg[rj];
+      break;
+    case 0x2B: /* addd */
+      reg[ri] = (double)reg[rj] + (double)reg[rk];
+      break;
+    case 0x2C: /* subd */
+      reg[ri] = (double)reg[rj] - (double)reg[rk];
+      break;
+    case 0x2D: /* muld */
+      reg[ri] = (double)reg[rj] * (double)reg[rk];
+      break;
+    case 0x2E: /* divd */
+      reg[ri] = (double)reg[rj] / (double)reg[rk];
+      break;
+    case 0x2F: /* negd */
+      reg[ri] = -(double)reg[rj];
+      break;
+    case 0x30: /* cvtld */
+      reg[ri] = (double)reg[rj];
+      break;
+    case 0x31: /* cvtdl */
+      reg[ri] = (long)reg[rj];
+      break;
+    default: /* stuff breaks */
+      fprintf( stderr, "Bad opcode, exiting!\n");
+      exit(-1);
+      break;
+  }
+  return 1;
+}
+
+static int32_t format2XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
+{
+  uint8_t opcode = (inst & 0xFF000000) >> 24;
+  uint8_t regi   = (inst & 0x00FF0000) >> 16;
+  uint8_t regj   = (inst & 0x0000FF00) >> 8;
+  uint8_t const8 = (inst & 0x000000FF);
+  return 0;
+}
+
+static int32_t format3XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
+{
+  uint8_t  opcode  = (inst & 0xFF000000) >> 24;
+  uint8_t  regi    = (inst & 0x00FF0000) >> 16;
+  uint16_t const16 = (inst & 0x0000FFFF);
   return 0;
 }
 
