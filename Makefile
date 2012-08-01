@@ -7,7 +7,7 @@ CFLAGS = -g -Wall -pthread
 
 AS520 = ../as520/as520
 
-all: sumVector pi
+all: sumVector pi ret_42
 
 sumVector: vm520.o sumVector.o sumVector.obj
 	$(CC) $(CFLAGS) vm520.o sumVector.o -o sumVector

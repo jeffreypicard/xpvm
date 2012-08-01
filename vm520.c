@@ -117,6 +117,7 @@ opcodes[] =
 #define BLOCK_REG 254
 
 uint64_t regs[MAX_REGS];
+static uint32_t blockCount = 0;
 
 #define MAX_OPCODE_XPVM 150
 static struct opcodeInfoXPVM
@@ -286,8 +287,8 @@ struct _block
   uint32_t      length_aux_data;
   uint64_t      annots;
   char          name[256];
-  char          *data;
-  char          *aux_data;
+  unsigned char *data;
+  unsigned char *aux_data;
   /*struct _block *next;*/
 } typedef block;
 
@@ -306,6 +307,38 @@ uint32_t reverseEndianness( uint32_t toRev )
 
   reversed = ((c1 >> 24) | (c2 >> 8) | (c3 << 8) | c4 << 24);
   return reversed;
+}
+
+/*
+ * cleanup
+ *
+ * This function is passed to atexit in the loadObjectFileXPVM
+ * function. It cleans up all the memory used when loading the
+ * object file.
+ */
+void cleanup( void )
+{
+  int i = 0;
+  if( blockCount )
+  {
+    if( regs[BLOCK_REG] )
+    {
+      for( i = 0; i < blockCount; i++ )
+      {
+        fprintf( stderr, "Freeing stuff inside block.\n");
+        block *b = ((block**)regs[BLOCK_REG])[i];
+        if( b )
+        {
+          fprintf( stderr, "b->data: %p\n", b->data );
+          fprintf( stderr, "b->aux_data: %p\n", b->aux_data );
+          free( b->data );
+          free( b->aux_data );
+          free( b );
+        }
+      }
+      free( (block**)regs[BLOCK_REG] );
+    }
+  }
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -328,11 +361,11 @@ uint32_t reverseEndianness( uint32_t toRev )
 int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
 {
   FILE *fp;
-  uint32_t blockCount = 0;
   uint64_t objLength = 0;
   const uint32_t MAGIC = 0x31303636;
   uint32_t magic = 0;
   int i = 0;
+  atexit( cleanup );
 
   /* Open the file */
   fp = fopen( filename, "r" );
@@ -365,7 +398,7 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
   }
   blockCount = reverseEndianness(blockCount);
 
-  if(!(regs[BLOCK_REG] = calloc( blockCount, sizeof(block) )))
+  if(!(regs[BLOCK_REG] = calloc( blockCount, sizeof(block*) )))
   {
     fprintf( stderr, "Error: malloc failed in loadObjectFileXPVM");
     exit(-1);
@@ -395,6 +428,8 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
     }
   }
 
+  fclose( fp );
+
   return 1;
 }
 
@@ -413,7 +448,7 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
  */
 static int getObjLengthXPVM( FILE *fp, uint32_t blockCount, uint64_t *objLength )
 {
-  fpos_t *fp_pos = NULL;malloc( sizeof(fpos_t) );
+  fpos_t *fp_pos = NULL;
   uint32_t cur_length = 0;
   int i = 0;
 
@@ -465,33 +500,116 @@ static int getObjLengthXPVM( FILE *fp, uint32_t blockCount, uint64_t *objLength 
  */
 static int readBlockXPVM( FILE *fp, int blockNum )
 {
-  block b = ((block*)regs[BLOCK_REG])[blockNum];
+#if DEBUG_XPVM
+  fprintf( stderr, "------- Reading block %d from object file. -------\n", 
+                   blockNum );
+#endif
+
+  block *b = calloc( 1, sizeof(block) );
+  if( !b )
+  {
+    fprintf( stderr, "Error: malloc failed in readBlockXPVM.\n");
+    exit(-1);
+  }
+  ((block**)regs[BLOCK_REG])[blockNum] = b;
   int i = 0;
-  int64_t temp = 0;
+  uint64_t temp = 0;
   /* Read name string from block */
-  while( (b.name[i] = fgetc( fp )) && ++i < MAX_NAME_LEN );
+  while( (b->name[i] = fgetc( fp )) && ++i < MAX_NAME_LEN );
   /* Name too long */
   if( MAX_NAME_LEN == i )
     return 0;
 
 #if DEBUG_XPVM
-  fprintf( stderr, "name: %s\n", b.name );
+  fprintf( stderr, "name: %s\n", b->name );
 #endif
 
   /* Read trait annotations */
-  b.annots = 0;
   for( i = 0; i < 8; i++ )
+    b->annots |=  ( (uint64_t)fgetc( fp ) << (64 - (i+1)*8) );
+
+#if DEBUG_XPVM
+  fprintf( stderr, "annots: %016x\n", b->annots );
+#endif
+
+  /* Read frame size */
+  for( i = 0; i < 4; i++ )
+    b->frame_size |=  ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+
+#if DEBUG_XPVM
+  fprintf( stderr, "frame_size: %08x\n", b->frame_size );
+#endif
+
+  /* Read contents length */
+  for( i = 0; i < 4; i++ )
+    b->length |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+
+#if DEBUG_XPVM
+  fprintf( stderr, "length: %08x\n", b->length );
+#endif
+
+  /* Allocate contents */
+  b->data = calloc( b->length, sizeof(char) );
+  if( !b->data && b->length )
   {
-    temp = (int64_t)fgetc( fp );
-    fprintf( stderr, "%d: %08x\n", i, temp );
-    fprintf( stderr, "shift: %d\n", (64 - (i+1)*8) );
-    fprintf( stderr, "%ds: %08x\n", i, (temp << (64 - (i+1)*8) ) );
-    b.annots |=  ( temp << (64 - (i+1)*8) );
-    fprintf( stderr, "annots: %08x\n", b.annots );
+    fprintf( stderr, "Error: malloc failed in readBlockXPVM\n");
+    exit(-1);
+  }
+
+  /* Read contents */
+  for( i = 0; i < b->length; i++ )
+  {
+    b->data[i] = fgetc( fp );
+#if DEBUG_XPVM
+    fprintf( stderr, "%02x\n", b->data[i] );
+#endif
+  }
+
+  /* Read number of exception handlers */
+  for( i = 0; i < 4; i++ )
+    b->num_except_handlers |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+
+#if DEBUG_XPVM
+  fprintf( stderr, "num_except_handlers: %08x\n", b->num_except_handlers );
+#endif
+
+  /* Read number of outsymbol references */
+  for( i = 0; i < 4; i++ )
+    b->num_outsymbol_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+
+#if DEBUG_XPVM
+  fprintf( stderr, "num_outsymbol_refs: %08x\n", b->num_outsymbol_refs );
+#endif
+
+  /* Read length of auxiliary data */
+  for( i = 0; i < 4; i++ )
+    b->length_aux_data |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+
+#if DEBUG_XPVM
+  fprintf( stderr, "length_aux_data: %08x\n", b->length_aux_data );
+#endif
+
+  /* Allocate auxiliary data */
+  b->aux_data = calloc( b->length_aux_data, sizeof(char) );
+  if( !b->aux_data && b->length_aux_data )
+  {
+    fprintf( stderr, "Error: malloc failed in readBlockXPVM\n");
+    exit(-1);
+  }
+
+  /* Read auxiliary data */
+  for( i = 0; i < b->length_aux_data; i++ )
+  {
+    b->aux_data[i] = fgetc( fp );
+#if DEBUG_XPVM
+    fprintf( stderr, "%02x\n", b->aux_data[i] );
+#endif
   }
 
 #if DEBUG_XPVM
-  fprintf( stderr, "annots: %08x\n", b.annots );
+  fprintf( stderr, "------- Block %d successfully "
+                   "read from object file. -------\n", 
+                   blockNum );
 #endif
 
   return 1;  
