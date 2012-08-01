@@ -15,6 +15,9 @@ sumVector: vm520.o sumVector.o sumVector.obj
 pi: vm520.o pi.o pi.obj
 	$(CC) $(CFLAGS) vm520.o pi.o -o pi
 
+ret_42: vm520.o ret_42.o ret_42.obj
+	$(CC) $(CFLAGS) vm520.o ret_42.o -o ret_42
+
 vm520.o: vm520.c vm520.h
 	$(CC) $(CFLAGS) -c vm520.c
 
@@ -23,6 +26,9 @@ sumVector.o: sumVector.c vm520.h
 
 pi.o: pi.c vm520.h
 	$(CC) $(CFLAGS) -c pi.c
+
+ret_42.o: ret_42.c vm520.h
+	$(CC) $(CFLAGS) -c ret_42.c
 
 sumVector.obj: sumVector.asm
 	$(AS520) sumVector.asm
@@ -33,5 +39,5 @@ pi.obj: pi.asm
 inst_disassemble:
 
 clean:
-	-rm -f sumVector.o pi.o vm520.o sumVector pi sumVector.obj pi.obj inst_disassemble
+	-rm -f sumVector.o pi.o vm520.o sumVector pi sumVector.obj pi.obj inst_disassemble ret_42 ret_42.o
 

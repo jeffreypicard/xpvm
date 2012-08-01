@@ -21,11 +21,14 @@
 #define MEMORY_SIZE 1048576
 #define MAX_ADDRESS (MEMORY_SIZE-1)
 
+#define DEBUG_XPVM 1
+
 // forward references
 static int readWord(FILE *fp, int *outWord);
 static int readSymbol(FILE *fp, char **outSymbol, unsigned int *outAddr);
 static int readObjectCode(FILE *fp, int *memory, int length);
-static int getObjLength( FILE *, uint32_t, uint64_t *);
+static int readBlockXPVM(FILE *fp, int blockNum );
+static int getObjLengthXPVM( FILE *, uint32_t, uint64_t *);
 static void cleanupInsymbols(void);
 static void *fetchExecute(void *);
 static int format1(unsigned int, int, int[]);
@@ -49,7 +52,7 @@ static struct insymbol {
 
 // the VM memory
 static int memory[MEMORY_SIZE];
-static int64_t memoryXPVM[MEMORY_SIZE];
+/*static int64_t memoryXPVM[MEMORY_SIZE];*/
 
 // mutex to control access to output log to stderr
 static pthread_mutex_t muTrace;
@@ -108,6 +111,12 @@ opcodes[] =
 {"push",    3, format3}, // 24
 {"pop",     3, format3}, // 25
 };
+
+#define MAX_REGS 256
+#define MAX_NAME_LEN 256
+#define BLOCK_REG 254
+
+uint64_t regs[MAX_REGS];
 
 #define MAX_OPCODE_XPVM 150
 static struct opcodeInfoXPVM
@@ -268,6 +277,37 @@ opcodesXPVM[] =
 {"whoami",    1, format1XPVM}, /* 147 */
 };
 
+struct _block
+{
+  uint32_t      length;
+  uint32_t      frame_size;
+  uint32_t      num_except_handlers;
+  uint32_t      num_outsymbol_refs;
+  uint32_t      length_aux_data;
+  uint64_t      annots;
+  char          name[256];
+  char          *data;
+  char          *aux_data;
+  /*struct _block *next;*/
+} typedef block;
+
+uint32_t reverseEndianness( uint32_t toRev )
+{
+  uint32_t reversed = 0;
+  uint32_t c1 = toRev & 0xFF000000;
+  uint32_t c2 = toRev & 0x00FF0000;
+  uint32_t c3 = toRev & 0x0000FF00;
+  uint32_t c4 = toRev & 0x000000FF;
+
+  /*fprintf( stderr, "c1: %8x\n", c1 >> 24);
+  fprintf( stderr, "c2: %8x\n", c2 >> 8);
+  fprintf( stderr, "c3: %8x\n", c3 << 8);
+  fprintf( stderr, "c4: %8x\n", c4 << 24);*/
+
+  reversed = ((c1 >> 24) | (c2 >> 8) | (c3 << 8) | c4 << 24);
+  return reversed;
+}
+
 //////////////////////////////////////////////////////////////////////
 // implementation of the public interface to the VM
 
@@ -308,6 +348,11 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
     *errorNumber = -3;
     return 0;
   }
+#if DEBUG_XPVM
+  fprintf( stderr, "magic: %x\n", magic );
+  fprintf( stderr, "magic: %x\n", reverseEndianness(magic) );
+#endif
+  magic = reverseEndianness(magic);
   if( MAGIC != magic )
   {
     *errorNumber = -3;
@@ -318,35 +363,43 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
     *errorNumber = -3;
     return 0;
   }
+  blockCount = reverseEndianness(blockCount);
+
+  if(!(regs[BLOCK_REG] = calloc( blockCount, sizeof(block) )))
+  {
+    fprintf( stderr, "Error: malloc failed in loadObjectFileXPVM");
+    exit(-1);
+  }
 
 #if DEBUG_XPVM
-  fprintf("blockCount: %d\n", blockCount );
+  fprintf(stderr, "blockCount: %d\n", blockCount );
 #endif
 
   /* 
    * Get the length of the object file 
    * and do a sanity check on the format 
    */
-  if( !getObjLength( fp, blockCount, &objLength ) )
+  if( !getObjLengthXPVM( fp, blockCount, &objLength ) )
   {
     *errorNumber = -3;
     return 0;
   }
 
-  /*
-  // read the object code into memory
-  if (!readObjectCode(fp, memory, objLength))
+  /* Read the blocks into memory */
+  for( i = 0; i < blockCount; i++ )
   {
-    *errorNumber = -3;
-    return 0;
+    if (!readBlockXPVM(fp, i))
+    {
+      *errorNumber = -3;
+      return 0;
+    }
   }
-  */
 
   return 1;
 }
 
 /*
- * getObjLength
+ * getObjLengthXPVM
  *
  * Gets the length of the object file in bytes.
  * Takes a file pointer, a 32 bit block count and a
@@ -358,31 +411,90 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
  * out symbol references?
  * Used for the XPVM.
  */
-static int getObjLength( FILE *fp, uint32_t blockCount, uint64_t *objLength )
+static int getObjLengthXPVM( FILE *fp, uint32_t blockCount, uint64_t *objLength )
 {
-  fpos_t *fp_pos = NULL;
+  fpos_t *fp_pos = NULL;malloc( sizeof(fpos_t) );
   uint32_t cur_length = 0;
   int i = 0;
 
+  if(!( fp_pos = malloc(sizeof(fpos_t))))
+  {
+    fprintf( stderr, "Error: malloc failed in getObjLength\n");
+    exit(-1);
+  }
+
   /* Save the current position in the file. */
+  fprintf( stderr, "In getObjLength\n");
   if( 0 > fgetpos( fp, fp_pos ) )
     return 0;
+
+  fprintf( stderr, "After intial read\n");
 
   *objLength = 0;
   for( i = 0; i < blockCount; i++ )
   {
     if( !readWord( fp, (int*) &cur_length ) )
       return 0;
+    cur_length = reverseEndianness(cur_length);
     if( 0 > fseek( fp, cur_length-1, SEEK_CUR ) )
       return 0;
     *objLength += cur_length;
   }
 
+  fprintf( stderr, "After objLength calculation\n");
+
   /* Return the file reading to its original position */
-  if( !fsetpos( fp, fp_pos ) )
+  if( 0 > fsetpos( fp, fp_pos ) )
     return 0;
 
+  free( fp_pos );
+
+  fprintf( stderr, "Leaving getObjLength\n");
+
   return 1;
+}
+
+/*
+ * readBlockXPVM
+ *
+ * Takes a file pointer to the object code
+ * and the number of the block which needs to
+ * be read in. Reads in all the information
+ * and stores it into the already allocated
+ * array of blocks stored at register BLOCK_REG.
+ */
+static int readBlockXPVM( FILE *fp, int blockNum )
+{
+  block b = ((block*)regs[BLOCK_REG])[blockNum];
+  int i = 0;
+  int64_t temp = 0;
+  /* Read name string from block */
+  while( (b.name[i] = fgetc( fp )) && ++i < MAX_NAME_LEN );
+  /* Name too long */
+  if( MAX_NAME_LEN == i )
+    return 0;
+
+#if DEBUG_XPVM
+  fprintf( stderr, "name: %s\n", b.name );
+#endif
+
+  /* Read trait annotations */
+  b.annots = 0;
+  for( i = 0; i < 8; i++ )
+  {
+    temp = (int64_t)fgetc( fp );
+    fprintf( stderr, "%d: %08x\n", i, temp );
+    fprintf( stderr, "shift: %d\n", (64 - (i+1)*8) );
+    fprintf( stderr, "%ds: %08x\n", i, (temp << (64 - (i+1)*8) ) );
+    b.annots |=  ( temp << (64 - (i+1)*8) );
+    fprintf( stderr, "annots: %08x\n", b.annots );
+  }
+
+#if DEBUG_XPVM
+  fprintf( stderr, "annots: %08x\n", b.annots );
+#endif
+
+  return 1;  
 }
 
 // load an object file
@@ -1062,22 +1174,24 @@ static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
     case 0x08: /* ldl */
     case 0x0A: /* ldf */
     case 0x0C: /* ldd */
+    /*
       abs_addr = reg[rj]+reg[rk];
       if( abs_addr < 0 || abs_addr >= MAX_ADDRESS )
         return VM520_ADDRESS_OUT_OF_RANGE;
       reg[ri] = memoryXPVM[ abs_addr ];
-      break;
+      break;*/
     case 0x10: /* sdb */
     case 0x12: /* sds */
     case 0x14: /* sdi */
     case 0x16: /* sdl */
     case 0x18: /* sdf */
     case 0x1A: /* sdd */
+    /*
       abs_addr = reg[rj]+reg[rk];
       if( abs_addr < 0 || abs_addr >= MAX_ADDRESS )
         return VM520_ADDRESS_OUT_OF_RANGE;
       memoryXPVM[ abs_addr ] = reg[ ri ];
-      break;
+      break;*/
     case 0x20: /* addl */
       reg[ri] = (long)reg[rj] + (long)reg[rk];
       break;
