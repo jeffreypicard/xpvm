@@ -1,10 +1,10 @@
-//
-// vm520.c
-//
-// the vm520 implementation
-//
-// this is Phil Hatcher's implementation
-//
+/*
+ * vm520.c
+ *
+ * the vm520 implementation
+ *
+ * this is Phil Hatcher's implementation
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-/* 32bit types */
+/* 32-bit and 64-bit types */
 #include <stdint.h>
 
 #include "vm520.h"
@@ -23,7 +23,14 @@
 
 #define DEBUG_XPVM 1
 
-// forward references
+#define EXIT_WITH_ERROR(...){     \
+  fprintf( stderr, __VA_ARGS__ ); \
+  exit( -1 );                     \
+}                                 \
+
+#define CAST_INT (uint32_t)
+
+/* forward references */
 static int readWord(FILE *fp, int *outWord);
 static int readSymbol(FILE *fp, char **outSymbol, unsigned int *outAddr);
 static int readObjectCode(FILE *fp, int *memory, int length);
@@ -31,6 +38,7 @@ static int readBlockXPVM(FILE *fp, int blockNum );
 static int getObjLengthXPVM( FILE *, uint32_t, uint64_t *);
 static void cleanupInsymbols(void);
 static void *fetchExecute(void *);
+static void *fetchExecuteXPVM(void *v);
 static int format1(unsigned int, int, int[]);
 static int format2(unsigned int, int, int[]);
 static int format3(unsigned int, int, int[]);
@@ -118,6 +126,28 @@ opcodes[] =
 
 uint64_t regs[MAX_REGS];
 static uint32_t blockCount = 0;
+static unsigned char *pcXPVM = 0;
+
+struct _stackFrame
+{
+  uint64_t      pc;
+  uint64_t      reg255;
+  uint64_t      retReg;
+  unsigned char *locals;
+} typedef stackFrame;
+
+/*
+ * Struct for the VM stack.
+ */
+struct _stackNode
+{
+  stackFrame        *data;
+  struct _stackNode  *prev;
+} typedef stackNode;
+
+static stackNode *stack = NULL;/*{{ NULL, NULL }};*/
+
+
 
 #define MAX_OPCODE_XPVM 150
 static struct opcodeInfoXPVM
@@ -326,7 +356,7 @@ void cleanup( void )
       for( i = 0; i < blockCount; i++ )
       {
         fprintf( stderr, "Freeing stuff inside block.\n");
-        block *b = ((block**)regs[BLOCK_REG])[i];
+        block *b = ((block**) CAST_INT regs[BLOCK_REG])[i];
         if( b )
         {
           fprintf( stderr, "b->data: %p\n", b->data );
@@ -336,7 +366,7 @@ void cleanup( void )
           free( b );
         }
       }
-      free( (block**)regs[BLOCK_REG] );
+      free( (block**) CAST_INT regs[BLOCK_REG] );
     }
   }
 }
@@ -398,11 +428,8 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
   }
   blockCount = reverseEndianness(blockCount);
 
-  if(!(regs[BLOCK_REG] = calloc( blockCount, sizeof(block*) )))
-  {
-    fprintf( stderr, "Error: malloc failed in loadObjectFileXPVM");
-    exit(-1);
-  }
+  if(!(regs[BLOCK_REG] = (uint64_t) CAST_INT calloc( blockCount, sizeof(block*) )))
+    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
 
 #if DEBUG_XPVM
   fprintf(stderr, "blockCount: %d\n", blockCount );
@@ -507,13 +534,10 @@ static int readBlockXPVM( FILE *fp, int blockNum )
 
   block *b = calloc( 1, sizeof(block) );
   if( !b )
-  {
-    fprintf( stderr, "Error: malloc failed in readBlockXPVM.\n");
-    exit(-1);
-  }
-  ((block**)regs[BLOCK_REG])[blockNum] = b;
+    EXIT_WITH_ERROR("Error: malloc failed in readBlockXPVM");
+  ((block**) CAST_INT regs[BLOCK_REG])[blockNum] = b;
   int i = 0;
-  uint64_t temp = 0;
+  /*uint64_t temp = 0;*/
   /* Read name string from block */
   while( (b->name[i] = fgetc( fp )) && ++i < MAX_NAME_LEN );
   /* Name too long */
@@ -529,7 +553,7 @@ static int readBlockXPVM( FILE *fp, int blockNum )
     b->annots |=  ( (uint64_t)fgetc( fp ) << (64 - (i+1)*8) );
 
 #if DEBUG_XPVM
-  fprintf( stderr, "annots: %016x\n", b->annots );
+  fprintf( stderr, "annots: %016llx\n", b->annots );
 #endif
 
   /* Read frame size */
@@ -760,6 +784,93 @@ int putWord(unsigned int addr, int word)
     memory[addr] = word;
     return 1;
   }
+}
+
+/*
+ * executeXPVM
+ *
+ * Inital execute function for the XPVM.
+ * Copied from the execute function for vm520 at this point.
+ */
+int32_t executeXPVM( uint32_t numProcessors, int32_t *termStatus, 
+                     int trace )
+{
+  int i;
+  /* Inialize the VM to run */
+  stack = calloc( 1, sizeof(stackNode) );
+  if( !stack )
+    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
+  stack->data = calloc( 1, sizeof(stackFrame) );
+  if( !stack->data )
+    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
+  block *b = ((block**) CAST_INT regs[BLOCK_REG])[0];
+  if( 0 < b->frame_size )
+    stack->data->locals = calloc( b->frame_size, sizeof(char) );
+  pcXPVM = b->data;
+
+
+  /* validate numProcessors */
+  if ((numProcessors == 0) || (numProcessors > VM520_MAX_PROCESSORS))
+    return 0;
+
+  /* record number of processors in a global for use by getpn inistruction*/
+  numberOfProcessors = numProcessors;
+
+  /* record in a global whether tracing is on or not */
+  doTrace = trace;
+
+  /* allocate storage for thread IDs */
+  pthread_t pt[numProcessors];
+
+  /* copy initial SP values into global array
+  for (i = 0; i < numProcessors; i++)
+  {
+    initialSP[i] = initSP[i];
+  }*/
+
+  /* initialize the mutex for controlling access to the trace file */
+  if (pthread_mutex_init(&muTrace, NULL) != 0)
+  {
+    perror("can't init mutex");
+    return 0;
+  }
+
+  /* initialize the mutex for controlling access to the memory bus */
+  if (pthread_mutex_init(&muBus, NULL) != 0)
+  {
+    perror("can't init mutex");
+    return 0;
+  }
+
+#if DEBUG_XPVM
+  fprintf( stderr, "Starting processors.\n");
+#endif
+  /* start a thread for each processor */
+  for (i = 0; i < numProcessors; i++)
+  {
+    if (pthread_create(&pt[i], NULL, fetchExecuteXPVM, (void *) i) != 0)
+    {
+      perror("error in thread create");
+      return 0;
+    }
+  }
+
+  /* now use pthread_join to wait for each thread to finish.
+   * the return value of the thread indicates whether they halted on an
+   * error or not.
+   */
+  for (i = 0; i < numProcessors; i++)
+  {
+    void *ret;
+    if (pthread_join(pt[i], &ret) != 0)
+    {
+      perror("error in thread create");
+      exit(-1);
+    }
+    termStatus[i] = (int) ret;
+  }
+
+  return 1;
 }
 
 //   the function returns 1 if all processors are successfully started and
@@ -1159,95 +1270,73 @@ static void *fetchExecute(void *v)
   return 0;
 }
 
+uint32_t assembleInst( unsigned char *pc )
+{
+  uint8_t c1 = pc[0];
+  uint8_t c2 = pc[1];
+  uint8_t c3 = pc[2];
+  uint8_t c4 = pc[3];
+  fprintf( stderr, "\tc1: %02x\n"
+                   "\tc2: %02x\n"
+                   "\tc3: %02x\n"
+                   "\tc4: %02x\n",
+                   c1,c2,c3,c4);
+  uint32_t inst = (c1 << 24) | (c2 << 16) | (c3 << 8) | c4;
+  return inst;
+}
+
 /*
  * fetchExecuteXPVM
  *
  * XPVM version of the fetch/execute function
  *
  */
-/* 256 registers per processor */
-#define NUM_REGS 256
 static void *fetchExecuteXPVM(void *v)
 {
-  int i;
+#if DEBUG_XPVM
+  fprintf( stderr, "In fetchExecuteXPVM.\n");
+#endif
+  /*int i = 0;*/
 
-  // the processor ID is passed in
+  /* the processor ID is passed in */
   int processorID = (int) v;
 
-  // the registers
-  // int reg[16];
-  uint64_t reg[NUM_REGS];
-  for (i = 0; i < NUM_REGS; i += 1)
-    reg[i] = 0;
-  SP = initialSP[processorID];
-
-  // fetch/execute cycle
+  /* fetch/execute cycle */
   while (1)
   {
-    // check to see if the PC is in range
+#if DEBUG_XPVM
+    fprintf( stderr, "------- start fetch/execute cycle -------\n");
+#endif
+    /* check to see if the PC is in range
     if ((PC < 0) || (PC >= MAX_ADDRESS))
     {
       return (void *) VM520_ADDRESS_OUT_OF_RANGE;
-    }
-
-    // print to the trace if tracing turned on
-    if (doTrace)
-    {
-      // lock the trace mutex
-      if (pthread_mutex_lock(&muTrace) != 0)
-      {
-        fprintf(stderr, "procID %d: pthread_mutex_lock failed for trace!\n",
-          processorID);
-        exit(-1);
-      }
-
-      // display the registers
-      /*
-      fprintf(stderr, "<%d>: %08x %08x %08x %08x %08x %08x %08x %08x\n",
-        processorID,
-        reg[0], reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]);
-      fprintf(stderr, "<%d>: %08x %08x %08x %08x %08x %08x %08x %08x\n",
-        processorID,
-        reg[8], reg[9], reg[10], reg[11], reg[12], reg[13], reg[14], reg[15]);
-      */
-
-      // disassemble the next instruction to be executed
-      char buffer[100];
-      int errNum;
-      int ret = disassemble(reg[15], buffer, &errNum);
-      if (ret == 0)
-      {
-        fprintf(stderr,
-          "procID %d: disassemble failed (%d) for fetchExecute!\n",
-          processorID, errNum);
-        exit(-1);
-      }
-      fprintf(stderr, "<%d>: %s\n", processorID, buffer); 
-
-      // unlock the trace mutex
-      if (pthread_mutex_unlock(&muTrace) != 0)
-      {
-        fprintf(stderr, "procID %d: pthread_mutex_unlock failed for trace!\n",
-          processorID);
-        exit(-1);
-      }
-    }
+    }*/
 
     // fetch
     //int word = memory[PC];
-    uint32_t word = memory[PC];
+    uint32_t word = assembleInst( pcXPVM );
+#if DEBUG_XPVM
+    fprintf( stderr, "\tword: %08x\n", word );
+#endif
 
     // update PC
-    PC += 1;
+    pcXPVM += 4;
 
     // execute
     //unsigned char opcode = word & 0xFF;
     uint32_t opcode = (word & 0xFF000000) >> 24;
-    if (opcode > MAX_OPCODE) // illegal instruction
+#if DEBUG_XPVM
+    fprintf( stderr, "\topcode: %d\n", opcode );
+#endif
+    if (opcode > MAX_OPCODE_XPVM) // illegal instruction
     {
       return  (void *) VM520_ILLEGAL_INSTRUCTION;
     }
-    int32_t ret = opcodesXPVM[opcode].formatFunc(processorID, word, reg);
+    int32_t ret = opcodesXPVM[opcode].formatFunc(processorID, word, regs);
+#if DEBUG_XPVM
+    fprintf( stderr, "\tret: %d\n", ret );
+#endif
     if (ret <= 0)
     {
       return (void *) ret;
@@ -1259,6 +1348,9 @@ static void *fetchExecuteXPVM(void *v)
         processorID);
       exit(-1);
     }
+#if DEBUG_XPVM
+    fprintf( stderr, "------- end fetch/execute cycle -------\n");
+#endif
   }
   
   // won't reach here
@@ -1280,9 +1372,9 @@ static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
 {
   uint8_t opcode = (inst & 0xFF000000) >> 24;
   uint8_t ri     = (inst & 0x00FF0000) >> 16;
-  uint8_t rj     =  (inst & 0x0000FF00) >> 8;
+  uint8_t rj     = (inst & 0x0000FF00) >> 8;
   uint8_t rk     = (inst & 0x000000FF);
-  int64_t abs_addr = 0;
+  /*int64_t abs_addr = 0;*/
 
   switch( opcode )
   {
@@ -1349,6 +1441,19 @@ static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
     case 0x31: /* cvtdl */
       reg[ri] = (long)reg[rj];
       break;
+    case 0x74: /* ret */
+      reg[stack->data->retReg] = reg[rj];
+      pcXPVM = (unsigned char*) CAST_INT stack->data->pc;
+      /* pop frame */
+      stackNode *oldNode = stack;
+      stack = stack->prev;
+      free( oldNode->data );
+      free( oldNode );
+      /* popped last stack, halt */
+      fprintf( stderr, "\tr1: %lld\n", reg[1] );
+      if( !stack )
+        return 0;
+      break;
     default: /* stuff breaks */
       fprintf( stderr, "Bad opcode, exiting!\n");
       exit(-1);
@@ -1359,19 +1464,32 @@ static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
 
 static int32_t format2XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
 {
+  /*
   uint8_t opcode = (inst & 0xFF000000) >> 24;
-  uint8_t regi   = (inst & 0x00FF0000) >> 16;
-  uint8_t regj   = (inst & 0x0000FF00) >> 8;
-  uint8_t const8 = (inst & 0x000000FF);
+  uint8_t ri     = (inst & 0x00FF0000) >> 16;
+  uint8_t rj     = (inst & 0x0000FF00) >> 8;
+  int8_t const8  = (inst & 0x000000FF);
+  */
   return 0;
 }
 
 static int32_t format3XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
 {
-  uint8_t  opcode  = (inst & 0xFF000000) >> 24;
-  uint8_t  regi    = (inst & 0x00FF0000) >> 16;
-  uint16_t const16 = (inst & 0x0000FFFF);
-  return 0;
+  uint8_t opcode   = (inst & 0xFF000000) >> 24;
+  uint8_t ri       = (inst & 0x00FF0000) >> 16;
+  int16_t const16  = (inst & 0x0000FFFF);
+
+  switch( opcode )
+  {
+    case 0x0E: /* ldimm */
+      reg[ri] = (int64_t)const16;
+      break;
+    default: /* stuff breaks */
+      EXIT_WITH_ERROR("Bad opcode, exiting!");
+      break;
+  }
+
+  return 1;
 }
 
 // decode and execute a format 1 instruction: halt and ret

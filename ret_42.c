@@ -16,15 +16,18 @@
 
 int main( int argc, char **argv )
 {
- /* error for functions returning from vm520 */
- int error_number = 0;
+  /* error for functions returning from vm520 */
+  int errorNumber = 0;
+  int termStatus[1];
 
   /* load ret_42.obj, Note: this was written by hand in object code */
-  if (!loadObjectFileXPVM("ret_42.obj", &error_number))
+  if (!loadObjectFileXPVM("ret_42.obj", &errorNumber))
   {
-    fprintf(stderr, "loadObjectFileXPVM fails with error %d\n", error_number);
+    fprintf(stderr, "loadObjectFileXPVM fails with error %d\n", errorNumber);
     exit(-1);
   }
+
+  executeXPVM( 1, termStatus, 0 );
 
   return 0;
 }

@@ -4,6 +4,11 @@
 // public interface to the vm520 implementation
 //
 
+#ifndef __VM520_H
+#define __VM520_H
+
+#include <stdint.h>
+
 // maximum number of processors
 #define VM520_MAX_PROCESSORS 16
 
@@ -65,6 +70,8 @@ int putWord(unsigned int addr, int word);
 //   Note: that all other registers will be initialized to 0, including
 //     the PC and the FP.
 //
+int32_t executeXPVM( uint32_t numProcessors, int32_t *termStatus, 
+                     int trace );
 int execute(unsigned int numProcessors, unsigned int initialSP[],
       int terminationStatus[], int trace);
 
@@ -87,3 +94,4 @@ int execute(unsigned int numProcessors, unsigned int initialSP[],
 //     VM520_ILLEGAL_INSTRUCTION
 int disassemble(unsigned int address, char *buffer, int *errorNumber);
 
+#endif
