@@ -47,9 +47,10 @@ static int format5(unsigned int, int, int[]);
 static int format6(unsigned int, int, int[]);
 static int format7(unsigned int, int, int[]);
 static int format8(unsigned int, int, int[]);
-static int32_t format1XPVM( uint32_t, uint32_t, uint64_t *);
-static int32_t format2XPVM( uint32_t, uint32_t, uint64_t *);
-static int32_t format3XPVM( uint32_t, uint32_t, uint64_t *);
+typedef struct _stackNode stackNode;
+static int32_t format1XPVM( uint32_t, uint32_t, uint64_t*, stackNode*);
+static int32_t format2XPVM( uint32_t, uint32_t, uint64_t*, stackNode*);
+static int32_t format3XPVM( uint32_t, uint32_t, uint64_t*, stackNode*);
 
 // linked list to keep track of (symbol,address) pairs for insymbols
 static struct insymbol {
@@ -124,6 +125,8 @@ opcodes[] =
 #define MAX_NAME_LEN 256
 #define BLOCK_REG 254
 
+#define PCX regs2[253]
+
 uint64_t regs[MAX_REGS];
 static uint32_t blockCount = 0;
 static unsigned char *pcXPVM = 0;
@@ -154,7 +157,8 @@ static struct opcodeInfoXPVM
 {
    char* opcode;
    int format;
-   int (*formatFunc)(unsigned int procID, uint32_t inst, uint64_t *reg);
+   int (*formatFunc)(unsigned int procID, uint32_t inst, uint64_t *reg,
+                     stackNode *stack );
 }
 opcodesXPVM[] =
 {
@@ -786,6 +790,93 @@ int putWord(unsigned int addr, int word)
   }
 }
 
+struct _cmdArg
+{
+  char s[0];
+} typedef cmdArg;
+
+struct _feArg
+{
+  int procNum;
+  int64_t retVal;
+  uint64_t *regs;
+  stackNode *stack;
+} typedef feArg;
+
+/*
+ * doInitProc
+ *
+ * C function implementation of the initProc
+ * opcode. also used to start the VM executing
+ * the main function.
+ */
+int doInitProc( int64_t *retVal, uint64_t work, int argc, 
+                 uint64_t *regBank )
+{
+  int i = 0;
+  int len = 0;
+  cmdArg *ar1 = NULL, *ar2 = NULL;
+  /* Inialize the VM to run */
+  uint64_t regs2[256];
+  regs2[BLOCK_REG] = regs[BLOCK_REG]; /* FIXME */
+  stackNode *stack2 = calloc( 1, sizeof(stackNode) );
+  if( !stack2 )
+    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
+  stack2->data = calloc( 1, sizeof(stackFrame) );
+  if( !stack2->data )
+    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
+  block *b = ((block**) CAST_INT regs2[BLOCK_REG])[0];
+  if( 0 < b->frame_size )
+    stack->data->locals = calloc( b->frame_size, sizeof(char) );
+  PCX = (uint64_t) CAST_INT b->data;
+  /* FIXME */
+  /* This currently only supports 10 args */
+  for( i = 0; i < argc && i < 10; i++ )
+  {
+    ar1 = ((cmdArg*) CAST_INT (regBank+i));
+    len = strlen( ar1->s );
+    ar2 = calloc( 1, sizeof(cmdArg) + len + 1 );
+    if( !ar2 )
+      EXIT_WITH_ERROR("Error: malloc failed in doInitProc\n");
+    strcpy( ar2->s, ar1->s );
+    regs2[i] = (uint64_t) CAST_INT ar2;
+  }
+
+  pthread_t pt;
+
+#if DEBUG_XPVM
+  fprintf( stderr, "Starting processors.\n");
+#endif
+
+  feArg *ar3 = calloc( 1, sizeof(feArg) );
+  if( !ar3 )
+    EXIT_WITH_ERROR("Error: malloc failed in doInitProc\n");
+  ar3->procNum = 1;
+  ar3->stack = stack2;
+  ar3->regs = regs2;
+
+  if (pthread_create(&pt, NULL, fetchExecuteXPVM, (void *) ar3) != 0)
+  {
+    perror("error in thread create");
+    exit(-1);
+  }
+
+  /* now use pthread_join to wait for each thread to finish.
+   * the return value of the thread indicates whether they halted on an
+   * error or not.
+   */
+  void *ret;
+  if (pthread_join(pt, &ret) != 0)
+  {
+    perror("error in thread join");
+    exit(-1);
+  }
+  *retVal = ar3->retVal;
+  /*fprintf( stderr, "retVal: %d\n", (int)*retVal );*/
+
+  return (int)ret;
+}
+
 /*
  * executeXPVM
  *
@@ -1297,9 +1388,12 @@ static void *fetchExecuteXPVM(void *v)
   fprintf( stderr, "In fetchExecuteXPVM.\n");
 #endif
   /*int i = 0;*/
+  feArg *args = (feArg*)v;
+  stackNode *stack = args->stack;
+  uint64_t *regs2 = args->regs;
 
   /* the processor ID is passed in */
-  int processorID = (int) v;
+  int processorID = args->procNum;
 
   /* fetch/execute cycle */
   while (1)
@@ -1315,13 +1409,13 @@ static void *fetchExecuteXPVM(void *v)
 
     // fetch
     //int word = memory[PC];
-    uint32_t word = assembleInst( pcXPVM );
+    uint32_t word = assembleInst( (unsigned char*) CAST_INT PCX );
 #if DEBUG_XPVM
     fprintf( stderr, "\tword: %08x\n", word );
 #endif
 
     // update PC
-    pcXPVM += 4;
+    PCX += 4;
 
     // execute
     //unsigned char opcode = word & 0xFF;
@@ -1333,12 +1427,21 @@ static void *fetchExecuteXPVM(void *v)
     {
       return  (void *) VM520_ILLEGAL_INSTRUCTION;
     }
-    int32_t ret = opcodesXPVM[opcode].formatFunc(processorID, word, regs);
+    int32_t ret = opcodesXPVM[opcode].formatFunc(processorID, word, regs2, stack );
 #if DEBUG_XPVM
     fprintf( stderr, "\tret: %d\n", ret );
 #endif
     if (ret <= 0)
     {
+      /* Check if ret was called */
+      if( 0x74 == opcode )
+      {
+        args->retVal = regs2[stack->data->retReg];
+        stackNode *oldNode = stack;
+        stack = stack->prev;
+        free( oldNode->data );
+        free( oldNode );
+      }
       return (void *) ret;
     }
     else if (ret != 1)
@@ -1368,7 +1471,8 @@ static void *fetchExecuteXPVM(void *v)
  *
  */
 
-static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
+static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg,
+                            stackNode *stack )
 {
   uint8_t opcode = (inst & 0xFF000000) >> 24;
   uint8_t ri     = (inst & 0x00FF0000) >> 16;
@@ -1445,14 +1549,14 @@ static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
       reg[stack->data->retReg] = reg[rj];
       pcXPVM = (unsigned char*) CAST_INT stack->data->pc;
       /* pop frame */
+      fprintf( stderr, "\tr1: %lld\n", reg[1] );
+      /* popped last stack, halt */
+      if( !stack->prev )
+        return 0;
       stackNode *oldNode = stack;
       stack = stack->prev;
       free( oldNode->data );
       free( oldNode );
-      /* popped last stack, halt */
-      fprintf( stderr, "\tr1: %lld\n", reg[1] );
-      if( !stack )
-        return 0;
       break;
     default: /* stuff breaks */
       fprintf( stderr, "Bad opcode, exiting!\n");
@@ -1462,7 +1566,8 @@ static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
   return 1;
 }
 
-static int32_t format2XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
+static int32_t format2XPVM( uint32_t pID, uint32_t inst, uint64_t *reg,
+                            stackNode *stack )
 {
   /*
   uint8_t opcode = (inst & 0xFF000000) >> 24;
@@ -1473,7 +1578,8 @@ static int32_t format2XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
   return 0;
 }
 
-static int32_t format3XPVM( uint32_t pID, uint32_t inst, uint64_t *reg )
+static int32_t format3XPVM( uint32_t pID, uint32_t inst, uint64_t *reg,
+                            stackNode *stack )
 {
   uint8_t opcode   = (inst & 0xFF000000) >> 24;
   uint8_t ri       = (inst & 0x00FF0000) >> 16;

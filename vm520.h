@@ -70,6 +70,8 @@ int putWord(unsigned int addr, int word);
 //   Note: that all other registers will be initialized to 0, including
 //     the PC and the FP.
 //
+int doInitProc( int64_t *retVal, uint64_t work, int argc, 
+                 uint64_t *regBank );
 int32_t executeXPVM( uint32_t numProcessors, int32_t *termStatus, 
                      int trace );
 int execute(unsigned int numProcessors, unsigned int initialSP[],
