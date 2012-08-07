@@ -130,6 +130,7 @@ opcodes[] =
 uint64_t regs[MAX_REGS];
 static uint32_t blockCount = 0;
 static unsigned char *pcXPVM = 0;
+uint64_t blockPtr = 0;
 
 struct _stackFrame
 {
@@ -355,12 +356,13 @@ void cleanup( void )
   int i = 0;
   if( blockCount )
   {
-    if( regs[BLOCK_REG] )
+    if( blockPtr )
     {
       for( i = 0; i < blockCount; i++ )
       {
         fprintf( stderr, "Freeing stuff inside block.\n");
-        block *b = ((block**) CAST_INT regs[BLOCK_REG])[i];
+        //block *b = ((block**) CAST_INT regs[BLOCK_REG])[i];
+        block *b = ((block**) CAST_INT blockPtr)[i];
         if( b )
         {
           fprintf( stderr, "b->data: %p\n", b->data );
@@ -432,7 +434,7 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
   }
   blockCount = reverseEndianness(blockCount);
 
-  if(!(regs[BLOCK_REG] = (uint64_t) CAST_INT calloc( blockCount, sizeof(block*) )))
+  if(!(blockPtr = (uint64_t) CAST_INT calloc( blockCount, sizeof(block*) )))
     EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
 
 #if DEBUG_XPVM
@@ -539,7 +541,7 @@ static int readBlockXPVM( FILE *fp, int blockNum )
   block *b = calloc( 1, sizeof(block) );
   if( !b )
     EXIT_WITH_ERROR("Error: malloc failed in readBlockXPVM");
-  ((block**) CAST_INT regs[BLOCK_REG])[blockNum] = b;
+  ((block**) CAST_INT blockPtr)[blockNum] = b;
   int i = 0;
   /*uint64_t temp = 0;*/
   /* Read name string from block */
@@ -797,10 +799,9 @@ struct _cmdArg
 
 struct _feArg
 {
-  int procNum;
-  int64_t retVal;
-  uint64_t *regs;
-  stackNode *stack;
+  uint64_t *regBank;
+  uint64_t work;
+  int argc;
 } typedef feArg;
 
 /*
@@ -810,15 +811,18 @@ struct _feArg
  * opcode. also used to start the VM executing
  * the main function.
  */
-int doInitProc( int64_t *retVal, uint64_t work, int argc, 
+int doInitProc( int64_t *procID, uint64_t work, int argc, 
                  uint64_t *regBank )
 {
-  int i = 0;
+/*  int i = 0;
   int len = 0;
   cmdArg *ar1 = NULL, *ar2 = NULL;
+*/
   /* Inialize the VM to run */
+/*
   uint64_t regs2[256];
-  regs2[BLOCK_REG] = regs[BLOCK_REG]; /* FIXME */
+
+  regs2[BLOCK_REG] = blockPtr;
   stackNode *stack2 = calloc( 1, sizeof(stackNode) );
   if( !stack2 )
     EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
@@ -829,8 +833,10 @@ int doInitProc( int64_t *retVal, uint64_t work, int argc,
   if( 0 < b->frame_size )
     stack->data->locals = calloc( b->frame_size, sizeof(char) );
   PCX = (uint64_t) CAST_INT b->data;
+*/
   /* FIXME */
   /* This currently only supports 10 args */
+/*
   for( i = 0; i < argc && i < 10; i++ )
   {
     ar1 = ((cmdArg*) CAST_INT (regBank+i));
@@ -841,8 +847,8 @@ int doInitProc( int64_t *retVal, uint64_t work, int argc,
     strcpy( ar2->s, ar1->s );
     regs2[i] = (uint64_t) CAST_INT ar2;
   }
-
-  pthread_t pt;
+*/
+  pthread_t *pt = calloc( 1, sizeof(pthread_t) );
 
 #if DEBUG_XPVM
   fprintf( stderr, "Starting processors.\n");
@@ -851,30 +857,50 @@ int doInitProc( int64_t *retVal, uint64_t work, int argc,
   feArg *ar3 = calloc( 1, sizeof(feArg) );
   if( !ar3 )
     EXIT_WITH_ERROR("Error: malloc failed in doInitProc\n");
-  ar3->procNum = 1;
-  ar3->stack = stack2;
-  ar3->regs = regs2;
+  ar3->regBank = regBank;
+  ar3->work = work;
+  ar3->argc = argc;
 
-  if (pthread_create(&pt, NULL, fetchExecuteXPVM, (void *) ar3) != 0)
+  if (pthread_create(pt, NULL, fetchExecuteXPVM, (void *) ar3) != 0)
   {
     perror("error in thread create");
     exit(-1);
   }
 
+  *procID = (uint64_t) CAST_INT pt;
+
+  return 0;
+
   /* now use pthread_join to wait for each thread to finish.
    * the return value of the thread indicates whether they halted on an
    * error or not.
    */
+  /*
   void *ret;
-  if (pthread_join(pt, &ret) != 0)
+  if (pthread_join(*pt, &ret) != 0)
   {
     perror("error in thread join");
     exit(-1);
   }
-  *retVal = ar3->retVal;
+  fprintf( stderr, "ret: %d\n", (int)ret );*/
+  /*retVal = ar3->retVal;*/
   /*fprintf( stderr, "retVal: %d\n", (int)*retVal );*/
 
-  return (int)ret;
+  //return (int)ret;
+}
+
+int doProcJoin( uint64_t procID, uint64_t *retVal )
+{
+  pthread_t *pt = (pthread_t*) CAST_INT procID;
+  void *ret;
+  if (pthread_join(*pt, &ret) != 0)
+  {
+    perror("error in thread join");
+    exit(-1);
+  }
+  *retVal = (uint64_t) CAST_INT ret;
+
+  return 0;
 }
 
 /*
@@ -1376,6 +1402,12 @@ uint32_t assembleInst( unsigned char *pc )
   return inst;
 }
 
+struct _retStruct
+{
+  int status;
+  int64_t retVal;
+} typedef retStruct;
+
 /*
  * fetchExecuteXPVM
  *
@@ -1389,11 +1421,57 @@ static void *fetchExecuteXPVM(void *v)
 #endif
   /*int i = 0;*/
   feArg *args = (feArg*)v;
-  stackNode *stack = args->stack;
-  uint64_t *regs2 = args->regs;
+  uint64_t *regBank = args->regBank;
+  int argc = args->argc;
+  uint64_t work = args->work;
+
+  free( args );
+
+  int i = 0;
+  int len = 0;
+  cmdArg *ar1 = NULL, *ar2 = NULL;
+  /* Inialize the VM to run */
+  uint64_t regs2[256];
+  regs2[BLOCK_REG] = blockPtr; /* FIXME */
+  stackNode *stack2 = calloc( 1, sizeof(stackNode) );
+  if( !stack2 )
+    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
+  stack2->data = calloc( 1, sizeof(stackFrame) );
+  if( !stack2->data )
+    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
+  block *b = ((block**) CAST_INT regs2[BLOCK_REG])[0];
+  if( 0 < b->frame_size )
+    stack2->data->locals = calloc( b->frame_size, sizeof(char) );
+  
+  /* If work is null, set to pc to the main function in
+   * the object file. Otherwise set it to work 
+   */
+  if( !work )
+    PCX = (uint64_t) CAST_INT b->data;
+  else
+    PCX = work;
+
+  /* FIXME */
+  /* This currently only supports 10 args */
+  for( i = 0; i < argc && i < 10; i++ )
+  {
+    ar1 = ((cmdArg*) CAST_INT (regBank+i));
+    len = strlen( ar1->s );
+    ar2 = calloc( 1, sizeof(cmdArg) + len + 1 );
+    if( !ar2 )
+      EXIT_WITH_ERROR("Error: malloc failed in doInitProc\n");
+    strcpy( ar2->s, ar1->s );
+    regs2[i] = (uint64_t) CAST_INT ar2;
+  }
+
+  /*stackNode *stack = args->stack;
+  uint64_t *regs2 = args->regs;*/
 
   /* the processor ID is passed in */
-  int processorID = args->procNum;
+  /*int processorID = args->procNum;*/
+  retStruct *r = calloc( 1, sizeof(retStruct) );
+  if( !r )
+    EXIT_WITH_ERROR("Error: malloc failed in doInitProc\n");
 
   /* fetch/execute cycle */
   while (1)
@@ -1427,7 +1505,7 @@ static void *fetchExecuteXPVM(void *v)
     {
       return  (void *) VM520_ILLEGAL_INSTRUCTION;
     }
-    int32_t ret = opcodesXPVM[opcode].formatFunc(processorID, word, regs2, stack );
+    int32_t ret = opcodesXPVM[opcode].formatFunc(1, word, regs2, stack2 );
 #if DEBUG_XPVM
     fprintf( stderr, "\tret: %d\n", ret );
 #endif
@@ -1436,19 +1514,20 @@ static void *fetchExecuteXPVM(void *v)
       /* Check if ret was called */
       if( 0x74 == opcode )
       {
-        args->retVal = regs2[stack->data->retReg];
-        stackNode *oldNode = stack;
-        stack = stack->prev;
+        r->retVal = regs2[stack2->data->retReg];
+        stackNode *oldNode = stack2;
+        stack2 = stack2->prev;
         free( oldNode->data );
         free( oldNode );
       }
+      r->status = ret;
+      pthread_exit( (void*) CAST_INT r );
       return (void *) ret;
     }
     else if (ret != 1)
     {
       fprintf(stderr,
-        "procID %d: unexpected return value from formatFunc!\n",
-        processorID);
+        "Unexpected return value from formatFunc!\n");
       exit(-1);
     }
 #if DEBUG_XPVM
@@ -1456,7 +1535,7 @@ static void *fetchExecuteXPVM(void *v)
 #endif
   }
   
-  // won't reach here
+  /* won't reach here */
   return 0;
 }
 
@@ -1546,6 +1625,9 @@ static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg,
       reg[ri] = (long)reg[rj];
       break;
     case 0x74: /* ret */
+      fprintf( stderr, "\treg: %p\n", reg );
+      fprintf( stderr, "\tstack: %p\n", stack );
+      fprintf( stderr, "\tr1: %lld\n", reg[1] );
       reg[stack->data->retReg] = reg[rj];
       pcXPVM = (unsigned char*) CAST_INT stack->data->pc;
       /* pop frame */
