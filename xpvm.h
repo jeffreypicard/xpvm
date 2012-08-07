@@ -1,7 +1,7 @@
 //
-// vm520.h
+// xpvm.h
 //
-// public interface to the vm520 implementation
+// public interface to the XPVM implementation
 //
 
 #ifndef __VM520_H

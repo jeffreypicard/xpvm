@@ -1,43 +1,23 @@
 #
-# Makefile for running vm520
+# Makefile for running xpvm
 #
 
 CC = gcc
 CFLAGS = -g -Wall -pthread
 
-AS520 = ../as520/as520
-
-all: sumVector pi ret_42
-
-sumVector: vm520.o sumVector.o sumVector.obj
-	$(CC) $(CFLAGS) vm520.o sumVector.o -o sumVector
-
-pi: vm520.o pi.o pi.obj
-	$(CC) $(CFLAGS) vm520.o pi.o -o pi
+all: ret_42
 
 ret_42: vm520.o ret_42.o ret_42.obj
 	$(CC) $(CFLAGS) vm520.o ret_42.o -o ret_42
 
-vm520.o: vm520.c vm520.h
+xpvm.o: xpvm.c xpvm.h
 	$(CC) $(CFLAGS) -c vm520.c
 
-sumVector.o: sumVector.c vm520.h
-	$(CC) $(CFLAGS) -c sumVector.c
-
-pi.o: pi.c vm520.h
-	$(CC) $(CFLAGS) -c pi.c
-
-ret_42.o: ret_42.c vm520.h
+ret_42.o: ret_42.c xpvm.h
 	$(CC) $(CFLAGS) -c ret_42.c
-
-sumVector.obj: sumVector.asm
-	$(AS520) sumVector.asm
-
-pi.obj: pi.asm
-	$(AS520) pi.asm
 
 inst_disassemble:
 
 clean:
-	-rm -f sumVector.o pi.o vm520.o sumVector pi sumVector.obj pi.obj inst_disassemble ret_42 ret_42.o
+	-rm -f xpvm.o inst_disassemble ret_42 ret_42.o
 

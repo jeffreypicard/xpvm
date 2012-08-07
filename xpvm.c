@@ -1,9 +1,10 @@
 /*
- * vm520.c
+ * xpvm.c
  *
- * the vm520 implementation
+ * Implementation of the XPVM
  *
- * this is Phil Hatcher's implementation
+ * Author: Jeffrey Picard
+ * Heavily based on Professor Hatcher's vm520.
  */
 
 #include <stdio.h>
@@ -16,7 +17,7 @@
 /* 32-bit and 64-bit types */
 #include <stdint.h>
 
-#include "vm520.h"
+#include "xpvm.h"
 
 #define MEMORY_SIZE 1048576
 #define MAX_ADDRESS (MEMORY_SIZE-1)

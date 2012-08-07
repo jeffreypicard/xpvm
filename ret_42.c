@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <pthread.h>
-#include "vm520.h"
+#include "xpvm.h"
 
 /* setting for the execute call */
 #define TRACE 0
