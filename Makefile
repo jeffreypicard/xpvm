@@ -7,11 +7,11 @@ CFLAGS = -g -Wall -pthread
 
 all: ret_42
 
-ret_42: vm520.o ret_42.o ret_42.obj
-	$(CC) $(CFLAGS) vm520.o ret_42.o -o ret_42
+ret_42: xpvm.o ret_42.o ret_42.obj
+	$(CC) $(CFLAGS) xpvm.o ret_42.o -o ret_42
 
 xpvm.o: xpvm.c xpvm.h
-	$(CC) $(CFLAGS) -c vm520.c
+	$(CC) $(CFLAGS) -c xpvm.c
 
 ret_42.o: ret_42.c xpvm.h
 	$(CC) $(CFLAGS) -c ret_42.c
