@@ -1,13 +1,48 @@
-//
-// xpvm.h
-//
-// public interface to the XPVM implementation
-//
+/*
+ * xpvm.h
+ *
+ * Public interface to the XPVM implementation.
+ *
+ * Author: Jeffrey Picard
+ */
 
 #ifndef __VM520_H
 #define __VM520_H
 
 #include <stdint.h>
+
+/*************************** Macros ********************************/
+
+#define DEBUG_XPVM 1
+
+#define MAX_REGS 256
+#define MAX_NAME_LEN 256
+
+uint64_t CIO;
+uint64_t CIB;
+
+#define PCX reg[253]
+#define PC_REG 253
+#define CIO_REG 253
+//#define CIO reg[CIO_REG]
+#define CIB_REG 252
+//#define CBO reg[CBO_REG]
+#define BLOCK_REG 254
+#define STACK_FRAME_REG 255
+
+#define CAST_INT (uint32_t)
+
+#define TWO_8_TO_16( b1, b2 ) ((uint16_t)b1 << 8) | b2
+
+#define EXIT_WITH_ERROR(...){     \
+  fprintf( stderr, __VA_ARGS__ ); \
+  exit( -1 );                     \
+}                                 \
+
+/* Definition for block types */
+#define FUNCTION_BLOCK 1
+#define DATA_BLOCK 2
+#define STACK_FRAME_BLOCK 3
 
 // maximum number of processors
 #define VM520_MAX_PROCESSORS 16
@@ -25,76 +60,135 @@
 #define VM520_ADDRESS_OUT_OF_RANGE -2
 #define VM520_ILLEGAL_INSTRUCTION -3
 
-// load an object file
-//   only one object file may be loaded at a time
-//   the function returns 1 if successful and 0 otherwise
-//   if 0 is returned then an error number is returned through the second
-//     parameter if it is not NULL
-//   the following error numbers are supported:
-//     VM520_FILE_NOT_FOUND
-//     VM520_FILE_CONTAINS_OUTSYMBOLS
-//     VM520_FILE_IS_NOT_VALID
-//
-int loadObjectFile(char *filename, int *errorNumber);
+/****************** Public Interface Functions **********************/
+
 int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber );
 
-// get the address of a symbol in the current object file
-//   the label must be a symbol in the insymbol section of the object file
-//   the address is returned through the second parameter
-//   the function returns 1 if successful and 0 otherwise
-int getAddress(char *label, unsigned int *outAddr);
-
-// read a word from the memory of the current object file
-//   the word is returned through the second parameter
-//   the function returns 1 if successful and 0 otherwise
-int getWord(unsigned int addr, int *outWord);
-
-// write a word from the memory of the current object file
-//   the function returns 1 if successful and 0 otherwise
-int putWord(unsigned int addr, int word);
-
-// execute the current loaded object file
-//   the function returns 1 if all processors are successfully started and
-//     0 otherwise
-//   the first parameter specifies the number of processors to use
-//   the second parameter provides an initial SP value for each processor
-//   the third parameter is used to return the termination status for
-//     each processor
-//   the following termination statuses are supported:
-//     VM520_NORMAL_TERMINATION
-//     VM520_DIVIDE_BY_ZERO
-//     VM520_ADDRESS_OUT_OF_RANGE
-//     VM520_ILLEGAL_INSTRUCTION
-//   the fourth parameter is a Boolean indicating whether an instruction
-//     trace should be be printed to stderr
-//   Note: that all other registers will be initialized to 0, including
-//     the PC and the FP.
-//
 int doInitProc( int64_t *retVal, uint64_t work, int argc, 
                  uint64_t *regBank );
 int doProcJoin( uint64_t procID, uint64_t *retVal );
-int32_t executeXPVM( uint32_t numProcessors, int32_t *termStatus, 
-                     int trace );
-int execute(unsigned int numProcessors, unsigned int initialSP[],
-      int terminationStatus[], int trace);
 
-// disassemble the word at the given address
-//   return 1 if successful and 0 otherwise
-//   the first parameter contains the address of the word to disassemble
-//   the second parameter is a pointer to a buffer where the output should be
-//     placed
-//   the output will be the opcode followed by a space, followed by the
-//     comma separated operands (if any). each comma will be followed by
-//     a space. PC-relative addresses are converted to absolute addresses
-//     and displayed in decimal. offsets and immediate constants are displayed
-//     in decimal.
-//   the caller can rely that the output will certainly not consume more than
-//     100 characters
-//   the third parameter is used to return an error code if an error is
-//     encountered
-//   the following error codes are supported:
-//     VM520_ADDRESS_OUT_OF_RANGE
-//     VM520_ILLEGAL_INSTRUCTION
-int disassemble(unsigned int address, char *buffer, int *errorNumber);
+/************************** Structs *********************************/
+
+/*
+ * Struct for a stack frame in the VM.
+ */
+typedef struct _d_block d_block;
+struct _stackFrame
+{
+  uint64_t      pc;
+  uint64_t      cio;
+  uint64_t      cib;
+  uint64_t      reg255;
+  uint64_t      retReg;
+  //unsigned char *locals;
+  d_block       *block;
+} typedef stackFrame;
+
+/*
+ * Struct for the VM stack.
+ */
+struct _stackNode
+{
+  stackFrame        *data;
+  struct _stackNode *prev;
+} typedef stackNode;
+
+/*
+ * Struct for the blocks read into memory from the object file.
+ */
+struct _f_block
+{
+  uint32_t      length;
+  uint32_t      frame_size;
+  uint32_t      num_except_handlers;
+  uint32_t      num_outsymbol_refs;
+  uint32_t      length_aux_data;
+  uint64_t      annots;
+  uint64_t      owner;
+  char          name[256];
+  unsigned char *data;
+  unsigned char *aux_data;
+  /*struct _block *next;*/
+} typedef f_block;
+
+/*
+ * Struct for the blocks that contain only data. 
+ */
+struct _d_block
+{
+  uint32_t      length;
+  uint64_t      annots;
+  uint64_t      owner;
+  unsigned char data[0]; 
+} typedef d_block;
+
+union _block_u
+{
+  f_block     *b;
+  d_block     *db;
+  stackFrame  *sf;
+} typedef block_u;
+
+struct _block_w
+{
+  /* 1: f_block
+   * 2: d_block
+   * 3: stackFrame
+   */
+  int     type;
+  block_u u;
+} typedef block_w;
+
+/*
+ * Struct to hold the arguments passed to doProcInit.
+ */
+struct _cmdArg
+{
+  char s[0];
+} typedef cmdArg;
+
+/*
+ * Struct for passing back the exit status and return value
+ * of a processor (thread)i from doJoin.
+ */
+struct _retStruct
+{
+  int status;
+  int64_t retVal;
+} typedef retStruct;
+
+/*
+ * Struct for the arguments to the fetchExecute function
+ * which is the work function passed to the pthread.
+ */
+struct _feArg
+{
+  uint64_t *regBank;
+  uint64_t work;
+  int argc;
+} typedef feArg;
+
+
+/********************** Opcode Declerations **************************/
+
+int ldl_9( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+int ldimm_14( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+int sti_21( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+int addl_32( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+              uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+int subl_34( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+              uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+int mull_36( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+              uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+int ldfunc_112( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+                uint8_t opcode, uint8_t ri, uint8_t c3, uint8_t c4 );
+int call_114( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+int ret_116( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
 
 #endif

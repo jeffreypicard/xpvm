@@ -5,6 +5,7 @@ pi
 sumVector
 inst_disassemble
 ret_42
+xpvm
 
 # object files
 *.o

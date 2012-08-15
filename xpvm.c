@@ -1,7 +1,7 @@
 /*
  * xpvm.c
  *
- * Implementation of the XPVM
+ * Implementation of the XPVM.
  *
  * Author: Jeffrey Picard
  * Heavily based on Professor Hatcher's vm520.
@@ -19,27 +19,11 @@
 
 #include "xpvm.h"
 
-#define MEMORY_SIZE 1048576
-#define MAX_ADDRESS (MEMORY_SIZE-1)
-
-#define DEBUG_XPVM 1
-
-#define EXIT_WITH_ERROR(...){     \
-  fprintf( stderr, __VA_ARGS__ ); \
-  exit( -1 );                     \
-}                                 \
-
-#define CAST_INT (uint32_t)
-
 /* forward references */
-static int readWord(FILE *fp, int *outWord);
+static int readWordXPVM(FILE *fp, uint32_t *outWord);
 static int readBlockXPVM(FILE *fp, int blockNum );
 static int getObjLengthXPVM( FILE *, uint32_t, uint64_t *);
 static void *fetchExecuteXPVM(void *v);
-typedef struct _stackNode stackNode;
-static int32_t format1XPVM( uint32_t, uint32_t, uint64_t*, stackNode*);
-static int32_t format2XPVM( uint32_t, uint32_t, uint64_t*, stackNode*);
-static int32_t format3XPVM( uint32_t, uint32_t, uint64_t*, stackNode*);
 
 /* linked list to keep track of (symbol,address) pairs for insymbols
 static struct insymbol {
@@ -48,128 +32,111 @@ static struct insymbol {
   struct insymbol *next;
 } *insymbols = NULL;*/
 
-#define MAX_REGS 256
-#define MAX_NAME_LEN 256
-#define BLOCK_REG 254
-
-#define PCX regs2[253]
-
 uint64_t regs[MAX_REGS];
 static uint32_t blockCount = 0;
-static unsigned char *pcXPVM = 0;
 uint64_t blockPtr = 0;
 
-struct _stackFrame
-{
-  uint64_t      pc;
-  uint64_t      reg255;
-  uint64_t      retReg;
-  unsigned char *locals;
-} typedef stackFrame;
-
-/*
- * Struct for the VM stack.
+/* 
+ * Table of opcodes.
+ *    Indexed by opcode number.
+ *    Contains opcode name as a string, format type 
+ *    as an int and a function pointer to the C 
+ *    implementation of the opcode.
  */
-struct _stackNode
-{
-  stackFrame        *data;
-  struct _stackNode  *prev;
-} typedef stackNode;
-
 #define MAX_OPCODE_XPVM 150
 static struct opcodeInfoXPVM
 {
-   char* opcode;
-   int format;
-   int (*formatFunc)(unsigned int procID, uint32_t inst, uint64_t *reg,
-                     stackNode *stack );
+  char* opcode;
+  int format;
+  int (*formatFunc)( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+                     uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
 }
 opcodesXPVM[] =
 {
 {"0",         0, NULL},        /* 0 */
 {"1",         0, NULL},        /* 1 */
-{"ldb",       1, format1XPVM}, /* 2 */
-{"ldb",       2, format2XPVM}, /* 3 */
-{"lds",       1, format1XPVM}, /* 4 */
-{"lds",       2, format2XPVM}, /* 5 */
-{"ldi",       1, format1XPVM}, /* 6 */
-{"ldi",       2, format2XPVM}, /* 7 */
-{"ldl",       1, format1XPVM}, /* 8 */
-{"ldl",       2, format2XPVM}, /* 9 */
-{"ldf",       1, format1XPVM}, /* 10 */
-{"ldf",       2, format2XPVM}, /* 11 */
-{"ldd",       1, format1XPVM}, /* 12 */
-{"ldd",       2, format2XPVM}, /* 13 */
-{"ldimm",     3, format3XPVM}, /* 14 */
-{"ldimm2",    3, format3XPVM}, /* 15 */
-{"stb",       1, format1XPVM}, /* 16 */
-{"stb",       2, format2XPVM}, /* 17 */
-{"sts",       1, format1XPVM}, /* 18 */
-{"sts",       2, format2XPVM}, /* 19 */
-{"sti",       1, format1XPVM}, /* 20 */
-{"sti",       2, format2XPVM}, /* 21 */
-{"stl",       1, format1XPVM}, /* 22 */
-{"stl",       2, format2XPVM}, /* 23 */
-{"stf",       1, format1XPVM}, /* 24 */
-{"stf",       2, format2XPVM}, /* 25 */
-{"std",       1, format1XPVM}, /* 26 */
-{"std",       2, format2XPVM}, /* 27 */
+{"ldb",       1, NULL}, /* 2 */
+{"ldb",       2, NULL}, /* 3 */
+{"lds",       1, NULL}, /* 4 */
+{"lds",       2, NULL}, /* 5 */
+{"ldi",       1, NULL}, /* 6 */
+{"ldi",       2, NULL}, /* 7 */
+{"ldl",       1, NULL}, /* 8 */
+{"ldl",       2, ldl_9},       /* 9 */
+{"ldf",       1, NULL}, /* 10 */
+{"ldf",       2, NULL}, /* 11 */
+{"ldd",       1, NULL}, /* 12 */
+{"ldd",       2, NULL}, /* 13 */
+{"ldimm",     3, ldimm_14},    /* 14 */
+{"ldimm2",    3, NULL}, /* 15 */
+{"stb",       1, NULL}, /* 16 */
+{"stb",       2, NULL}, /* 17 */
+{"sts",       1, NULL}, /* 18 */
+{"sts",       2, NULL}, /* 19 */
+{"sti",       1, NULL}, /* 20 */
+{"sti",       2, sti_21},      /* 21 */
+{"stl",       1, NULL}, /* 22 */
+{"stl",       2, NULL}, /* 23 */
+{"stf",       1, NULL}, /* 24 */
+{"stf",       2, NULL}, /* 25 */
+{"std",       1, NULL}, /* 26 */
+{"std",       2, NULL}, /* 27 */
 {"28",        0, NULL},        /* 28 */
 {"29",        0, NULL},        /* 29 */
 {"30",        0, NULL},        /* 30 */
 {"31",        0, NULL},        /* 31 */
-{"addl",      1, format1XPVM}, /* 32 */
-{"addl",      2, format2XPVM}, /* 33 */
-{"subl",      1, format1XPVM}, /* 34 */
-{"subl",      2, format2XPVM}, /* 35 */
-{"mull",      1, format1XPVM}, /* 36 */
-{"mull",      2, format2XPVM}, /* 37 */
-{"divl",      1, format1XPVM}, /* 38 */
-{"divl",      2, format2XPVM}, /* 39 */
-{"reml",      1, format1XPVM}, /* 40 */
-{"reml",      2, format2XPVM}, /* 41 */
-{"negl",      1, format1XPVM}, /* 42 */
-{"addd",      1, format1XPVM}, /* 43 */
-{"subd",      1, format1XPVM}, /* 44 */
-{"muld",      1, format1XPVM}, /* 45 */
-{"divd",      1, format1XPVM}, /* 46 */
-{"negd",      1, format2XPVM}, /* 47 */
-{"cvtld",     1, format1XPVM}, /* 48 */
-{"cvtdl",     1, format1XPVM}, /* 49 */
-{"lshift",    1, format1XPVM}, /* 50 */
-{"lshift",    2, format2XPVM}, /* 51 */
-{"rshift",    1, format1XPVM}, /* 52 */
-{"rshift",    2, format2XPVM}, /* 53 */
-{"rshiftu",   1, format1XPVM}, /* 54 */
-{"rshiftu",   2, format2XPVM}, /* 55 */
-{"and",       1, format1XPVM}, /* 56 */
-{"or",        1, format1XPVM}, /* 57 */
-{"xor",       1, format1XPVM}, /* 58 */
-{"ornot",     1, format1XPVM}, /* 59 */
+{"addl",      1, addl_32},     /* 32 */
+{"addl",      2, NULL}, /* 33 */
+{"subl",      1, subl_34},     /* 34 */
+{"subl",      2, NULL}, /* 35 */
+{"mull",      1, mull_36},     /* 36 */
+{"mull",      2, NULL}, /* 37 */
+{"divl",      1, NULL}, /* 38 */
+{"divl",      2, NULL}, /* 39 */
+{"reml",      1, NULL}, /* 40 */
+{"reml",      2, NULL}, /* 41 */
+{"negl",      1, NULL}, /* 42 */
+{"addd",      1, NULL}, /* 43 */
+{"subd",      1, NULL}, /* 44 */
+{"muld",      1, NULL}, /* 45 */
+{"divd",      1, NULL}, /* 46 */
+{"negd",      1, NULL}, /* 47 */
+{"cvtld",     1, NULL}, /* 48 */
+{"cvtdl",     1, NULL}, /* 49 */
+{"lshift",    1, NULL}, /* 50 */
+{"lshift",    2, NULL}, /* 51 */
+{"rshift",    1, NULL}, /* 52 */
+{"rshift",    2, NULL}, /* 53 */
+{"rshiftu",   1, NULL}, /* 54 */
+{"rshiftu",   2, NULL}, /* 55 */
+{"and",       1, NULL}, /* 56 */
+{"or",        1, NULL}, /* 57 */
+{"xor",       1, NULL}, /* 58 */
+{"ornot",     1, NULL}, /* 59 */
 {"60",        0, NULL},        /* 60 */
 {"61",        0, NULL},        /* 61 */
 {"62",        0, NULL},        /* 62 */
 {"63",        0, NULL},        /* 63 */
-{"cmpeq",     1, format1XPVM}, /* 64 */
-{"cmpeq",     2, format2XPVM}, /* 65 */
-{"cmple",     1, format1XPVM}, /* 66 */
-{"cmple",     2, format2XPVM}, /* 67 */
-{"cmplt",     1, format1XPVM}, /* 68 */
-{"cmplt",     2, format2XPVM}, /* 69 */
-{"cmpule",    1, format1XPVM}, /* 70 */
-{"cmpule",    2, format2XPVM}, /* 71 */
-{"cmpult",    1, format1XPVM}, /* 72 */
-{"cmpult",    2, format2XPVM}, /* 73 */
-{"fcmpeq",    1, format1XPVM}, /* 74 */
-{"fcmple",    1, format1XPVM}, /* 75 */
-{"fcmplt",    1, format1XPVM}, /* 76 */
+{"cmpeq",     1, NULL}, /* 64 */
+{"cmpeq",     2, NULL}, /* 65 */
+{"cmple",     1, NULL}, /* 66 */
+{"cmple",     2, NULL}, /* 67 */
+{"cmplt",     1, NULL}, /* 68 */
+{"cmplt",     2, NULL}, /* 69 */
+{"cmpule",    1, NULL}, /* 70 */
+{"cmpule",    2, NULL}, /* 71 */
+{"cmpult",    1, NULL}, /* 72 */
+{"cmpult",    2, NULL}, /* 73 */
+{"fcmpeq",    1, NULL}, /* 74 */
+{"fcmple",    1, NULL}, /* 75 */
+{"fcmplt",    1, NULL}, /* 76 */
 {"77",        0, NULL},        /* 77 */
 {"78",        0, NULL},        /* 78 */
 {"79",        0, NULL},        /* 79 */
-{"jmp",       3, format3XPVM}, /* 80 */
-{"jmp",       1, format1XPVM}, /* 81 */
-{"btrue",     3, format3XPVM}, /* 82 */
-{"bfalse",    3, format3XPVM}, /* 83 */
+{"jmp",       3, NULL}, /* 80 */
+{"jmp",       1, NULL}, /* 81 */
+{"btrue",     3, NULL}, /* 82 */
+{"bfalse",    3, NULL}, /* 83 */
 {"84",        0, NULL},        /* 84 */
 {"85",        0, NULL},        /* 85 */
 {"86",        0, NULL},        /* 86 */
@@ -182,27 +149,27 @@ opcodesXPVM[] =
 {"93",        0, NULL},        /* 93 */
 {"94",        0, NULL},        /* 94 */
 {"95",        0, NULL},        /* 95 */
-{"malloc",    1, format1XPVM}, /* 96 */
-{"mmexa",     1, format1XPVM}, /* 97 */
-{"mmexa",     2, format2XPVM}, /* 98 */
-{"atraits",   1, format1XPVM}, /* 99 */
-{"dtraits",   1, format1XPVM}, /* 100 */
-{"rannots",   1, format1XPVM}, /* 101 */
-{"towner",    1, format1XPVM}, /* 102 */
-{"lock",      1, format1XPVM}, /* 103 */
-{"unlock",    1, format1XPVM}, /* 104 */
-{"wait",      1, format1XPVM}, /* 105 */
-{"sig",       1, format1XPVM}, /* 106 */
-{"sigall",    1, format1XPVM}, /* 107 */
+{"malloc",    1, NULL}, /* 96 */
+{"mmexa",     1, NULL}, /* 97 */
+{"mmexa",     2, NULL}, /* 98 */
+{"atraits",   1, NULL}, /* 99 */
+{"dtraits",   1, NULL}, /* 100 */
+{"rannots",   1, NULL}, /* 101 */
+{"towner",    1, NULL}, /* 102 */
+{"lock",      1, NULL}, /* 103 */
+{"unlock",    1, NULL}, /* 104 */
+{"wait",      1, NULL}, /* 105 */
+{"sig",       1, NULL}, /* 106 */
+{"sigall",    1, NULL}, /* 107 */
 {"108",       0, NULL},        /* 108 */
 {"109",       0, NULL},        /* 109 */
 {"110",       0, NULL},        /* 110 */
 {"111",       0, NULL},        /* 111 */
-{"ldfunc",    3, format3XPVM}, /* 112 */
-{"ldfunc",    1, format1XPVM}, /* 113 */
-{"call",      2, format2XPVM}, /* 114 */
-{"calln",     2, format2XPVM}, /* 115 */
-{"ret",       1, format1XPVM}, /* 116 */
+{"ldfunc",    3, ldfunc_112},  /* 112 */
+{"ldfunc",    1, NULL}, /* 113 */
+{"call",      2, call_114},    /* 114 */
+{"calln",     2, NULL}, /* 115 */
+{"ret",       1, ret_116},     /* 116 */
 {"117",       0, NULL},        /* 117 */
 {"118",       0, NULL},        /* 118 */
 {"119",       0, NULL},        /* 119 */
@@ -214,8 +181,8 @@ opcodesXPVM[] =
 {"125",       0, NULL},        /* 125 */
 {"126",       0, NULL},        /* 126 */
 {"127",       0, NULL},        /* 127 */
-{"throw",     1, format1XPVM}, /* 128 */
-{"retrieve",  1, format1XPVM}, /* 129 */
+{"throw",     1, NULL}, /* 128 */
+{"retrieve",  1, NULL}, /* 129 */
 {"130",       0, NULL},        /* 130 */
 {"131",       0, NULL},        /* 131 */
 {"132",       0, NULL},        /* 132 */
@@ -230,26 +197,21 @@ opcodesXPVM[] =
 {"141",       0, NULL},        /* 141 */
 {"142",       0, NULL},        /* 142 */
 {"143",       0, NULL},        /* 143 */
-{"initProc",  2, format2XPVM}, /* 144 */
-{"join",      1, format1XPVM}, /* 145 */
-{"join2",     1, format1XPVM}, /* 146 */
-{"whoami",    1, format1XPVM}, /* 147 */
+{"initProc",  2, NULL}, /* 144 */
+{"join",      1, NULL}, /* 145 */
+{"join2",     1, NULL}, /* 146 */
+{"whoami",    1, NULL}, /* 147 */
 };
 
-struct _block
-{
-  uint32_t      length;
-  uint32_t      frame_size;
-  uint32_t      num_except_handlers;
-  uint32_t      num_outsymbol_refs;
-  uint32_t      length_aux_data;
-  uint64_t      annots;
-  char          name[256];
-  unsigned char *data;
-  unsigned char *aux_data;
-  /*struct _block *next;*/
-} typedef block;
 
+/*
+ * reverseEndianness
+ *
+ * This was a weird hack that I should have never used.
+ * Originally I was reading in the ints backwards with 
+ * the old vm520 read byte function then reversing their
+ * endianness. Don't ask why, I don't know.
+ */
 uint32_t reverseEndianness( uint32_t toRev )
 {
   uint32_t reversed = 0;
@@ -283,25 +245,32 @@ void cleanup( void )
     {
       for( i = 0; i < blockCount; i++ )
       {
+#if DEBUG_XPVM
         fprintf( stderr, "Freeing stuff inside block.\n");
+#endif
         //block *b = ((block**) CAST_INT regs[BLOCK_REG])[i];
-        block *b = ((block**) CAST_INT blockPtr)[i];
+        block_w *w = ((block_w**) CAST_INT blockPtr)[i];
+        f_block *b = w->u.b;
         if( b )
         {
+#if DEBUG_XPVM > 1
           fprintf( stderr, "b->data: %p\n", b->data );
           fprintf( stderr, "b->aux_data: %p\n", b->aux_data );
+#endif
           free( b->data );
           free( b->aux_data );
           free( b );
+          free( w );
         }
       }
-      free( (block**) CAST_INT regs[BLOCK_REG] );
+      free( (block_w**) CAST_INT blockPtr );
     }
   }
 }
 
-//////////////////////////////////////////////////////////////////////
-// implementation of the public interface to the VM
+/*********************************************************************
+ * implementation of the public interface to the VM
+ */
 
 /*
  * loadObjectFileXPVM
@@ -320,11 +289,14 @@ void cleanup( void )
 int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
 {
   FILE *fp;
-  uint64_t objLength = 0;
+  //uint64_t objLength = 0;
   const uint32_t MAGIC = 0x31303636;
   uint32_t magic = 0;
   int i = 0;
   atexit( cleanup );
+
+  CIO = 0;
+  CIB = 0;
 
   /* Open the file */
   fp = fopen( filename, "r" );
@@ -335,29 +307,26 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
   }
 
   /* read headers */
-  if( !readWord( fp, (int*) &magic ) )
+  if( !readWordXPVM( fp, (uint32_t*) &magic ) )
   {
     *errorNumber = -3;
     return 0;
   }
 #if DEBUG_XPVM
   fprintf( stderr, "magic: %x\n", magic );
-  fprintf( stderr, "magic: %x\n", reverseEndianness(magic) );
 #endif
-  magic = reverseEndianness(magic);
   if( MAGIC != magic )
   {
     *errorNumber = -3;
     return 0;
   }
-  if( !readWord( fp, (int *) &blockCount ) )
+  if( !readWordXPVM( fp, (uint32_t *) &blockCount ) )
   {
     *errorNumber = -3;
     return 0;
   }
-  blockCount = reverseEndianness(blockCount);
 
-  if(!(blockPtr = (uint64_t) CAST_INT calloc( blockCount, sizeof(block*) )))
+  if(!(blockPtr = (uint64_t) CAST_INT calloc( blockCount, sizeof(block_w*) )))
     EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
 
 #if DEBUG_XPVM
@@ -367,12 +336,14 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
   /* 
    * Get the length of the object file 
    * and do a sanity check on the format 
+   * FIXME: This doesn't work.
    */
+  /*
   if( !getObjLengthXPVM( fp, blockCount, &objLength ) )
   {
     *errorNumber = -3;
     return 0;
-  }
+  }*/
 
   /* Read the blocks into memory */
   for( i = 0; i < blockCount; i++ )
@@ -390,6 +361,7 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
 }
 
 /*
+ * FIXME FIXME FIXME: This is broken!
  * getObjLengthXPVM
  *
  * Gets the length of the object file in bytes.
@@ -401,6 +373,7 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
  * FIXME: Should this function also check to make sure there are no
  * out symbol references?
  * Used for the XPVM.
+ * FIXME FIXME FIXME: This is broken!
  */
 static int getObjLengthXPVM( FILE *fp, uint32_t blockCount, uint64_t *objLength )
 {
@@ -424,9 +397,11 @@ static int getObjLengthXPVM( FILE *fp, uint32_t blockCount, uint64_t *objLength 
   *objLength = 0;
   for( i = 0; i < blockCount; i++ )
   {
-    if( !readWord( fp, (int*) &cur_length ) )
+    if( !readWordXPVM( fp, &cur_length ) )
       return 0;
-    cur_length = reverseEndianness(cur_length);
+#if DEBUG_XPVM
+    fprintf( stderr, "cur_length: %d\n", cur_length );    
+#endif
     if( 0 > fseek( fp, cur_length-1, SEEK_CUR ) )
       return 0;
     *objLength += cur_length;
@@ -461,10 +436,17 @@ static int readBlockXPVM( FILE *fp, int blockNum )
                    blockNum );
 #endif
 
-  block *b = calloc( 1, sizeof(block) );
+  block_w *w = calloc( 1, sizeof(block_w) );
+  if( !w )
+    EXIT_WITH_ERROR("Error: malloc failed in readBlockXPVM");
+  w->type = 1;
+  ((block_w**) CAST_INT blockPtr)[blockNum] = w;
+
+  f_block *b = calloc( 1, sizeof(f_block) );
   if( !b )
     EXIT_WITH_ERROR("Error: malloc failed in readBlockXPVM");
-  ((block**) CAST_INT blockPtr)[blockNum] = b;
+  /* Finally put the function block in the container */
+  w->u.b = b;
   int i = 0;
   /*uint64_t temp = 0;*/
   /* Read name string from block */
@@ -568,18 +550,6 @@ static int readBlockXPVM( FILE *fp, int blockNum )
   return 1;  
 }
 
-struct _cmdArg
-{
-  char s[0];
-} typedef cmdArg;
-
-struct _feArg
-{
-  uint64_t *regBank;
-  uint64_t work;
-  int argc;
-} typedef feArg;
-
 /*
  * doInitProc
  *
@@ -624,21 +594,23 @@ int doProcJoin( uint64_t procID, uint64_t *retVal )
     exit(-1);
   }
   *retVal = (uint64_t) CAST_INT ret;
+  free( pt );
 
   return 0;
 }
 
-//////////////////////////////////////////////////////////////////////
-// functions to read an object file
+/*********************************************************************
+ * functions to read an object file
+ */
 
-// readWord
-//   read a word from the object file
-//   returns word through the second parameter
-//   returns 0 if EOF detected
-//
-//   Reads in 32 bits from a file and stores them into an integer,
-//   reversing Endianess in the process. {JP}
-static int readWord(FILE *fp, int *outWord)
+/*
+ * readWordXPVM
+ *
+ * Reads a word (32 bits) from the object file and
+ * returns it through the second parameter.
+ * returns 0 on EOF.
+ */
+static int readWordXPVM(FILE *fp, uint32_t *outWord)
 {
   int c1 = getc(fp);
   int c2 = getc(fp);
@@ -649,7 +621,7 @@ static int readWord(FILE *fp, int *outWord)
   {
     return 0;
   }
-  *outWord = ((c4 << 24) | (c3 << 16) | (c2 << 8) | c1);
+  *outWord = ((c1 << 24) | (c2 << 16) | (c3 << 8) | c4);
   return 1;
 }
 
@@ -672,11 +644,6 @@ uint32_t assembleInst( unsigned char *pc )
   return inst;
 }
 
-struct _retStruct
-{
-  int status;
-  int64_t retVal;
-} typedef retStruct;
 
 /*
  * fetchExecuteXPVM
@@ -701,17 +668,32 @@ static void *fetchExecuteXPVM(void *v)
   int len = 0;
   cmdArg *ar1 = NULL, *ar2 = NULL;
   /* Inialize the VM to run */
-  uint64_t regs2[256];
-  regs2[BLOCK_REG] = blockPtr; /* FIXME */
-  stackNode *stack2 = calloc( 1, sizeof(stackNode) );
-  if( !stack2 )
-    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
-  stack2->data = calloc( 1, sizeof(stackFrame) );
-  if( !stack2->data )
-    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
-  block *b = ((block**) CAST_INT regs2[BLOCK_REG])[0];
+  uint64_t reg[256];
+  reg[BLOCK_REG] = blockPtr;
+  stackNode *stack = calloc( 1, sizeof(stackNode) );
+  if( !stack )
+    EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");
+  stack->data = calloc( 1, sizeof(stackFrame) );
+  if( !stack->data )
+    EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");
+
+  block_w *wrapper = calloc( 1, sizeof(block_w) );
+  if( !wrapper )
+    EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");
+  wrapper->type = STACK_FRAME_BLOCK;
+  wrapper->u.sf = stack->data;
+  reg[STACK_FRAME_REG] = (uint64_t) CAST_INT wrapper;
+
+  f_block *b = (((block_w**) CAST_INT reg[BLOCK_REG])[0])->u.b;
   if( 0 < b->frame_size )
-    stack2->data->locals = calloc( b->frame_size, sizeof(char) );
+  {
+    stack->data->block = calloc( 1, sizeof(d_block) + b->frame_size );
+    /* FIXME: Throw OutOfMemory Exception */
+    if( !stack->data->block )
+      EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM\n");
+    stack->data->block->length = b->frame_size;
+  }
+   // stack->data->locals = calloc( b->frame_size, sizeof(char) );
   
   /* If work is null, set to pc to the main function in
    * the object file. Otherwise set it to work 
@@ -731,11 +713,11 @@ static void *fetchExecuteXPVM(void *v)
     if( !ar2 )
       EXIT_WITH_ERROR("Error: malloc failed in doInitProc\n");
     strcpy( ar2->s, ar1->s );
-    regs2[i] = (uint64_t) CAST_INT ar2;
+    reg[i] = (uint64_t) CAST_INT ar2;
   }
 
   /*stackNode *stack = args->stack;
-  uint64_t *regs2 = args->regs;*/
+  uint64_t *reg = args->regs;*/
 
   /* the processor ID is passed in */
   /*int processorID = args->procNum;*/
@@ -757,8 +739,13 @@ static void *fetchExecuteXPVM(void *v)
 
     // fetch
     //int word = memory[PC];
-    uint32_t word = assembleInst( (unsigned char*) CAST_INT PCX );
+    unsigned char *pc = (unsigned char*) CAST_INT PCX;
+    uint8_t c1 = pc[0];
+    uint8_t c2 = pc[1];
+    uint8_t c3 = pc[2];
+    uint8_t c4 = pc[3];
 #if DEBUG_XPVM
+    uint32_t word = assembleInst( (unsigned char*) CAST_INT PCX );
     fprintf( stderr, "\tword: %08x\n", word );
 #endif
 
@@ -767,7 +754,8 @@ static void *fetchExecuteXPVM(void *v)
 
     // execute
     //unsigned char opcode = word & 0xFF;
-    uint32_t opcode = (word & 0xFF000000) >> 24;
+    //uint32_t opcode = (word & 0xFF000000) >> 24;
+    uint32_t opcode = c1;
 #if DEBUG_XPVM
     fprintf( stderr, "\topcode: %d\n", opcode );
 #endif
@@ -775,7 +763,8 @@ static void *fetchExecuteXPVM(void *v)
     {
       return  (void *) VM520_ILLEGAL_INSTRUCTION;
     }
-    int32_t ret = opcodesXPVM[opcode].formatFunc(1, word, regs2, stack2 );
+    int32_t ret = opcodesXPVM[opcode].formatFunc(1, reg, &stack,
+                                                 c1, c2, c3, c4 );
 #if DEBUG_XPVM
     fprintf( stderr, "\tret: %d\n", ret );
 #endif
@@ -784,22 +773,21 @@ static void *fetchExecuteXPVM(void *v)
       /* Check if ret was called */
       if( 0x74 == opcode )
       {
-        r->retVal = regs2[stack2->data->retReg];
-        stackNode *oldNode = stack2;
-        stack2 = stack2->prev;
+        r->retVal = reg[stack->data->retReg];
+        stackNode *oldNode = stack;
+        stack = stack->prev;
+        free( oldNode->data->block );
         free( oldNode->data );
         free( oldNode );
+        free( wrapper );
       }
       r->status = ret;
       pthread_exit( (void*) CAST_INT r );
       return (void *) ret;
     }
     else if (ret != 1)
-    {
-      fprintf(stderr,
-        "Unexpected return value from formatFunc!\n");
-      exit(-1);
-    }
+      EXIT_WITH_ERROR("Error: Unexpected return value from formatFunc"
+                      " in fetchExecuteXPVM\n");
 #if DEBUG_XPVM
     fprintf( stderr, "------- end fetch/execute cycle -------\n");
 #endif
@@ -809,143 +797,35 @@ static void *fetchExecuteXPVM(void *v)
   return 0;
 }
 
-/************* format functions *****************
- *
- * The format functions for the XPVM take three arguments each.
- * The first argument sepcifies the processor ID, the second
- * are the 32 bits that specify the instruction, this will need
- * to be taken apart by the format function and how this will be
- * done shall depend on the format of which there are three.
- * The last argument will be an array of 64 bit registers.
- *
- */
+/***************** main function ********************/
 
-static int32_t format1XPVM( uint32_t pID, uint32_t inst, uint64_t *reg,
-                            stackNode *stack )
+int main( int argc, char **argv )
 {
-  uint8_t opcode = (inst & 0xFF000000) >> 24;
-  uint8_t ri     = (inst & 0x00FF0000) >> 16;
-  uint8_t rj     = (inst & 0x0000FF00) >> 8;
-  uint8_t rk     = (inst & 0x000000FF);
-  /*int64_t abs_addr = 0;*/
+  /* error for functions returning from vm520 */
+  int errorNumber = 0;
+  int64_t ptr = 0;
+  retStruct *r = NULL;
+  uint64_t retVal = 0;
 
-  switch( opcode )
-  {
-    case 0x02: /* ldb */
-    case 0x04: /* lds */
-    case 0x06: /* ldi */
-    case 0x08: /* ldl */
-    case 0x0A: /* ldf */
-    case 0x0C: /* ldd */
-    /*
-      abs_addr = reg[rj]+reg[rk];
-      if( abs_addr < 0 || abs_addr >= MAX_ADDRESS )
-        return VM520_ADDRESS_OUT_OF_RANGE;
-      reg[ri] = memoryXPVM[ abs_addr ];
-      break;*/
-    case 0x10: /* sdb */
-    case 0x12: /* sds */
-    case 0x14: /* sdi */
-    case 0x16: /* sdl */
-    case 0x18: /* sdf */
-    case 0x1A: /* sdd */
-    /*
-      abs_addr = reg[rj]+reg[rk];
-      if( abs_addr < 0 || abs_addr >= MAX_ADDRESS )
-        return VM520_ADDRESS_OUT_OF_RANGE;
-      memoryXPVM[ abs_addr ] = reg[ ri ];
-      break;*/
-    case 0x20: /* addl */
-      reg[ri] = (long)reg[rj] + (long)reg[rk];
-      break;
-    case 0x22: /* subl */
-      reg[ri] = (long)reg[rj] - (long)reg[rk];
-      break;
-    case 0x24: /* mull */
-      reg[ri] = (long)reg[rj] * (long)reg[rk];
-      break;
-    case 0x26: /* divl */
-      reg[ri] = (long)reg[rj] / (long)reg[rk];
-      break;
-    case 0x28: /* reml */
-      reg[ri] = (long)reg[rj] % (long)reg[rk];
-      break;
-    case 0x2A: /* negl */
-      reg[ri] = -(long)reg[rj];
-      break;
-    case 0x2B: /* addd */
-      reg[ri] = (double)reg[rj] + (double)reg[rk];
-      break;
-    case 0x2C: /* subd */
-      reg[ri] = (double)reg[rj] - (double)reg[rk];
-      break;
-    case 0x2D: /* muld */
-      reg[ri] = (double)reg[rj] * (double)reg[rk];
-      break;
-    case 0x2E: /* divd */
-      reg[ri] = (double)reg[rj] / (double)reg[rk];
-      break;
-    case 0x2F: /* negd */
-      reg[ri] = -(double)reg[rj];
-      break;
-    case 0x30: /* cvtld */
-      reg[ri] = (double)reg[rj];
-      break;
-    case 0x31: /* cvtdl */
-      reg[ri] = (long)reg[rj];
-      break;
-    case 0x74: /* ret */
-      fprintf( stderr, "\treg: %p\n", reg );
-      fprintf( stderr, "\tstack: %p\n", stack );
-      fprintf( stderr, "\tr1: %lld\n", reg[1] );
-      reg[stack->data->retReg] = reg[rj];
-      pcXPVM = (unsigned char*) CAST_INT stack->data->pc;
-      /* pop frame */
-      fprintf( stderr, "\tr1: %lld\n", reg[1] );
-      /* popped last stack, halt */
-      if( !stack->prev )
-        return 0;
-      stackNode *oldNode = stack;
-      stack = stack->prev;
-      free( oldNode->data );
-      free( oldNode );
-      break;
-    default: /* stuff breaks */
-      fprintf( stderr, "Bad opcode, exiting!\n");
-      exit(-1);
-      break;
-  }
-  return 1;
-}
+  if( argc != 2 )
+    EXIT_WITH_ERROR("Usage: xpvm one_object_file.obj\n");
 
-static int32_t format2XPVM( uint32_t pID, uint32_t inst, uint64_t *reg,
-                            stackNode *stack )
-{
-  /*
-  uint8_t opcode = (inst & 0xFF000000) >> 24;
-  uint8_t ri     = (inst & 0x00FF0000) >> 16;
-  uint8_t rj     = (inst & 0x0000FF00) >> 8;
-  int8_t const8  = (inst & 0x000000FF);
-  */
+  /* load ret_42.obj, Note: this was written by hand in object code */
+  if (!loadObjectFileXPVM(argv[1], &errorNumber))
+    EXIT_WITH_ERROR("loadObjectFileXPVM fails with error %d\n", errorNumber );
+
+  doInitProc( &ptr, 0, 0, NULL );
+
+  pthread_t *pt = (pthread_t*)(uint32_t)ptr;
+
+  doProcJoin( (uint64_t)(uint32_t)pt, &retVal );
+
+  r = (retStruct*) (uint32_t) retVal;
+
+  fprintf( stderr, "r->retVal: %d\n", (int)r->retVal );
+  fprintf( stderr, "r->status: %d\n", (int)r->status );
+
+  free( r );
+
   return 0;
-}
-
-static int32_t format3XPVM( uint32_t pID, uint32_t inst, uint64_t *reg,
-                            stackNode *stack )
-{
-  uint8_t opcode   = (inst & 0xFF000000) >> 24;
-  uint8_t ri       = (inst & 0x00FF0000) >> 16;
-  int16_t const16  = (inst & 0x0000FFFF);
-
-  switch( opcode )
-  {
-    case 0x0E: /* ldimm */
-      reg[ri] = (int64_t)const16;
-      break;
-    default: /* stuff breaks */
-      EXIT_WITH_ERROR("Bad opcode, exiting!");
-      break;
-  }
-
-  return 1;
 }
