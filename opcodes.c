@@ -13,45 +13,58 @@
 #include "xpvm.h"
 
 int ldb_2( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = *(int8_t *)(b->data + reg[rk]);
   return 1;
 }
 
 int ldb_3( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = *(int8_t *)(b->data + const8);
   return 1;
 }
 
 int lds_4( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = *(int16_t *)(b->data + reg[rk]);
   return 1;
 }
 
 int lds_5( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = *(int16_t *)(b->data + const8);
   return 1;
 }
 
 int ldi_6( unsigned int proc_id, uint64_t *reg, stackNode **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
-  reg[ri] = (int32_t) reg[rj] + const8;
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = *(int32_t *)(b->data + const8);
   return 1;
 }
 
 int ldi_7( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = (int64_t) *(int32_t *)(b->data + reg[rk]);
   return 1;
 }
 
 int ldl_8( unsigned int proc_id, uint64_t *reg, stackNode **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = *(int64_t *)(b->data + reg[rk]);
 
   return 1;
 }
@@ -59,47 +72,41 @@ int ldl_8( unsigned int proc_id, uint64_t *reg, stackNode **stack,
 int ldl_9( unsigned int proc_id, uint64_t *reg, stackNode **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
-  block_w *w = (block_w*) CAST_INT reg[rj];
-  switch( w->type )
-  {
-    case DATA_BLOCK:
-      reg[ri] = (uint64_t) *(int32_t *)(w->u.db->data + const8);
-      break;
-    case STACK_FRAME_BLOCK:
-      reg[ri] = (uint64_t) *(int32_t *)(w->u.sf->block->data + const8);
-      break;
-    case FUNCTION_BLOCK:
-      reg[ri] = (uint64_t) *(int32_t *)(w->u.b->data + const8);
-      break;
-    default:
-      EXIT_WITH_ERROR("Error: In ldl_8 bad block type.\n");
-      break;
-  }
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = *(int64_t*)(b->data + const8);
 
   return 1;
 }
 
 int ldf_10( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = *(uint64_t*)(float*)(b->data + reg[rk]);
   return 1;
 }
 
 int ldf_11( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  reg[ri] = *(uint64_t*)(float*)(b->data + const8);
   return 1;
 }
 
 int ldd_12( unsigned int proc_id, uint64_t *reg, stackNode **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
+  //block *b = (block*) CAST_INT reg[rj];
+  //reg[ri] = *(int64_t *)(b->data + const8);
   return 1;
 }
 
 int ldd_13( unsigned int proc_id, uint64_t *reg, stackNode **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
+  //block *b = (block*) CAST_INT reg[rj];
+  //reg[ri] = *(int64_t *)(b->data + const8);
   return 1;
 }
 
@@ -114,20 +121,35 @@ int ldimm_14( unsigned int proc_id, uint64_t *reg, stackNode **stack,
 }
 
 int ldimm2_15( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t c3, uint8_t c4 )
 {
+  int16_t const16  = TWO_8_TO_16( c3, c4 );
+  reg[ri] <<= 16;
+  reg[ri] = reg[ri] | (int64_t)const16;
   return 1;
 }
 
 int stb_16( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  if( reg[rk] > b->length )
+    EXIT_WITH_ERROR("Error: Bad memory access in stb_17!\n"
+                    "This should actually throw an exception!\n");
+  /* FIXME: Check annots */
+  *(int8_t *)(b->data + reg[rk]) = reg[ri];
   return 1;
 }
 
 int stb_17( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  block *b = (block*) CAST_INT reg[rj];
+  if( const8 > b->length )
+    EXIT_WITH_ERROR("Error: Bad memory access in stb_17!\n"
+                    "This should actually throw an exception!\n");
+  /* FIXME: Check annots */
+  *(int8_t *)(b->data + const8) = reg[ri];
   return 1;
 }
 
@@ -152,7 +174,13 @@ int sti_20( unsigned int proc_id, uint64_t *reg, stackNode **stack,
 int sti_21( unsigned int proc_id, uint64_t *reg, stackNode **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
-  block_w *w = (block_w*) CAST_INT reg[rj];
+  block *b = (block*) CAST_INT reg[rj];
+  if( const8 > b->length )
+    EXIT_WITH_ERROR("Error: Bad memory access in sti_21!\n"
+                    "This should actually throw an exception!\n");
+  /* FIXME: Check annots */
+  *(int32_t *)(b->data + const8) = reg[ri];
+  /*
   switch( w->type )
   {
     case DATA_BLOCK:
@@ -164,7 +192,7 @@ int sti_21( unsigned int proc_id, uint64_t *reg, stackNode **stack,
     default:
       EXIT_WITH_ERROR("Error: In sti_20 bad block type.\n");
       break;
-  }
+  }*/
 
   return 1;
 }
@@ -479,8 +507,18 @@ int bfalse_83( unsigned int proc_id, uint64_t *reg, stackNode **stack,
 }
 
 int malloc_96( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  pthread_mutex_lock( &malloc_xpvm_mu );
+
+  reg[ri] = malloc_xpvm( reg[rj] );
+
+  pthread_mutex_unlock( &malloc_xpvm_mu );
+
+  block *b = (block*) CAST_INT reg[ri];
+  b->owner = proc_id;
+  b->length = reg[rj];
+  b->annots = reg[rk];
   return 1;
 }
 
@@ -556,11 +594,11 @@ int ldfunc_112( unsigned int proc_id, uint64_t *reg, stackNode **stack,
   //uint16_t const16 = ((uint16_t)c3 << 8) | c4;
   uint16_t const16 = TWO_8_TO_16( c3, c4 );
   /*FIXME: Check index against f_block count */
-  block_w *w = *(((block_w **) CAST_INT reg[BLOCK_REG]) + const16); 
+  block *b = *(((block**) CAST_INT reg[BLOCK_REG]) + const16); 
 #if DEBUG_XPVM
-  fprintf( stderr, "\tldfunc: w: %p\n", w );
+  fprintf( stderr, "\tldfunc: b: %p\n", b );
 #endif
-  reg[ri] = (uint64_t) CAST_INT w;
+  reg[ri] = (uint64_t) CAST_INT b;
   return 1;
 }
 
@@ -573,8 +611,7 @@ int ldfunc_113( unsigned int proc_id, uint64_t *reg, stackNode **stack,
 int call_114( unsigned int proc_id, uint64_t *reg, stackNode **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
-  block_w *func_wrap = (block_w*) CAST_INT reg[rj];
-  f_block *b = func_wrap->u.b;
+  block *b = (block*) CAST_INT reg[rj];
 #if DEBUG_XPVM
   fprintf( stderr, "\tcall: b: %p\n", b );
 #endif
@@ -592,11 +629,14 @@ int call_114( unsigned int proc_id, uint64_t *reg, stackNode **stack,
   uint32_t frame_size = b->frame_size;
   if( frame_size )
   {
-    f->block = calloc( 1, sizeof(d_block) + frame_size );
+    f->block = calloc( 1, sizeof(block) );
     /* FIXME: Throw OutOfMemory Exception */
     if( !f->block )
       EXIT_WITH_ERROR("Error: malloc failed in call_114\n");
     f->block->length = frame_size;
+    f->block->data = calloc( frame_size, sizeof(char) );
+    if( !f->block->data )
+      EXIT_WITH_ERROR("Error: malloc failed in call_114\n");
 
     /*
     f->locals = calloc( frame_size, sizeof(char) );
@@ -610,8 +650,9 @@ int call_114( unsigned int proc_id, uint64_t *reg, stackNode **stack,
   new_node->data = f;
   new_node->prev = *stack;
   *stack = new_node;
-  block_w *frame_wrap = (block_w *) CAST_INT reg[255];
-  frame_wrap->u.sf = f;
+  //block_w *frame_wrap = (block_w *) CAST_INT reg[255];
+  //frame_wrap->u.sf = f;
+  reg[STACK_FRAME_REG] = (uint64_t) CAST_INT f->block;
   reg[PC_REG] = (uint64_t) CAST_INT b->data;
 
   return 1;

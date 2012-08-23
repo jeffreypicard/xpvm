@@ -10,6 +10,7 @@
 #define __VM520_H
 
 #include <stdint.h>
+#include <pthread.h>
 
 /*************************** Macros ********************************/
 
@@ -73,7 +74,7 @@ int doProcJoin( uint64_t procID, uint64_t *retVal );
 /*
  * Struct for a stack frame in the VM.
  */
-typedef struct _d_block d_block;
+typedef struct _block block;
 struct _stackFrame
 {
   uint64_t      pc;
@@ -82,7 +83,7 @@ struct _stackFrame
   uint64_t      reg255;
   uint64_t      retReg;
   //unsigned char *locals;
-  d_block       *block;
+  block         *block;
 } typedef stackFrame;
 
 /*
@@ -97,7 +98,7 @@ struct _stackNode
 /*
  * Struct for the blocks read into memory from the object file.
  */
-struct _f_block
+struct _block
 {
   uint32_t      length;
   uint32_t      frame_size;
@@ -106,15 +107,16 @@ struct _f_block
   uint32_t      length_aux_data;
   uint64_t      annots;
   uint64_t      owner;
-  char          name[256];
+  //char          name[256];
   unsigned char *data;
   unsigned char *aux_data;
-  /*struct _block *next;*/
-} typedef f_block;
+  //struct _block *next;
+} typedef block;
 
 /*
  * Struct for the blocks that contain only data. 
  */
+/*
 struct _d_block
 {
   uint32_t      length;
@@ -132,14 +134,14 @@ union _block_u
 
 struct _block_w
 {
-  /* 1: f_block
-   * 2: d_block
-   * 3: stackFrame
-   */
+  // 1: f_block
+  // 2: d_block
+  // 3: stackFrame
+   
   int     type;
   block_u u;
 } typedef block_w;
-
+*/
 /*
  * Struct to hold the arguments passed to doProcInit.
  */
@@ -169,26 +171,37 @@ struct _feArg
   int argc;
 } typedef feArg;
 
+/*
+ * Allocator function and mutex.
+ */
+pthread_mutex_t malloc_xpvm_mu;
+int malloc_xpvm_init( uint64_t );
+uint64_t malloc_xpvm( uint32_t );
 
 /********************** Opcode Declerations **************************/
 
-int ldl_9( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
-int ldimm_14( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
-int sti_21( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
-int addl_32( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-              uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
-int subl_34( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-              uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
-int mull_36( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-              uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
-int ldfunc_112( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-                uint8_t opcode, uint8_t ri, uint8_t c3, uint8_t c4 );
-int call_114( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
-int ret_116( unsigned int proc_id, uint64_t *reg, stackNode **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+#define OPCODE_FUNC ( unsigned int proc_id, uint64_t *reg, stackNode **stack, \
+                    uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+
+int ldb_2       OPCODE_FUNC
+int ldb_3       OPCODE_FUNC
+int lds_4       OPCODE_FUNC
+int lds_5       OPCODE_FUNC
+int ldi_6       OPCODE_FUNC
+int ldi_7       OPCODE_FUNC
+int ldl_8       OPCODE_FUNC
+int ldl_9       OPCODE_FUNC
+int ldimm_14    OPCODE_FUNC
+int ldimm2_15   OPCODE_FUNC
+int stb_16      OPCODE_FUNC
+int stb_17      OPCODE_FUNC
+int sti_21      OPCODE_FUNC
+int addl_32     OPCODE_FUNC
+int subl_34     OPCODE_FUNC
+int mull_36     OPCODE_FUNC
+int malloc_96   OPCODE_FUNC
+int ldfunc_112  OPCODE_FUNC
+int call_114    OPCODE_FUNC
+int ret_116     OPCODE_FUNC
 
 #endif

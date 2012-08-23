@@ -55,22 +55,22 @@ opcodesXPVM[] =
 {
 {"0",         0, NULL},        /* 0 */
 {"1",         0, NULL},        /* 1 */
-{"ldb",       1, NULL}, /* 2 */
-{"ldb",       2, NULL}, /* 3 */
-{"lds",       1, NULL}, /* 4 */
-{"lds",       2, NULL}, /* 5 */
-{"ldi",       1, NULL}, /* 6 */
-{"ldi",       2, NULL}, /* 7 */
-{"ldl",       1, NULL}, /* 8 */
+{"ldb",       1, ldb_2},       /* 2 */
+{"ldb",       2, ldb_3},       /* 3 */
+{"lds",       1, lds_4},       /* 4 */
+{"lds",       2, lds_5},       /* 5 */
+{"ldi",       1, ldi_6},       /* 6 */
+{"ldi",       2, ldi_7},       /* 7 */
+{"ldl",       1, ldl_8},       /* 8 */
 {"ldl",       2, ldl_9},       /* 9 */
 {"ldf",       1, NULL}, /* 10 */
 {"ldf",       2, NULL}, /* 11 */
 {"ldd",       1, NULL}, /* 12 */
 {"ldd",       2, NULL}, /* 13 */
 {"ldimm",     3, ldimm_14},    /* 14 */
-{"ldimm2",    3, NULL}, /* 15 */
+{"ldimm2",    3, ldimm2_15},   /* 15 */
 {"stb",       1, NULL}, /* 16 */
-{"stb",       2, NULL}, /* 17 */
+{"stb",       2, stb_17}, /* 17 */
 {"sts",       1, NULL}, /* 18 */
 {"sts",       2, NULL}, /* 19 */
 {"sti",       1, NULL}, /* 20 */
@@ -149,7 +149,7 @@ opcodesXPVM[] =
 {"93",        0, NULL},        /* 93 */
 {"94",        0, NULL},        /* 94 */
 {"95",        0, NULL},        /* 95 */
-{"malloc",    1, NULL}, /* 96 */
+{"malloc",    1, malloc_96}, /* 96 */
 {"mmexa",     1, NULL}, /* 97 */
 {"mmexa",     2, NULL}, /* 98 */
 {"atraits",   1, NULL}, /* 99 */
@@ -249,8 +249,7 @@ void cleanup( void )
         fprintf( stderr, "Freeing stuff inside block.\n");
 #endif
         //block *b = ((block**) CAST_INT regs[BLOCK_REG])[i];
-        block_w *w = ((block_w**) CAST_INT blockPtr)[i];
-        f_block *b = w->u.b;
+        block *b = ((block**) CAST_INT blockPtr)[i];
         if( b )
         {
 #if DEBUG_XPVM > 1
@@ -260,10 +259,9 @@ void cleanup( void )
           free( b->data );
           free( b->aux_data );
           free( b );
-          free( w );
         }
       }
-      free( (block_w**) CAST_INT blockPtr );
+      free( (block**) CAST_INT blockPtr );
     }
   }
 }
@@ -326,7 +324,7 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
     return 0;
   }
 
-  if(!(blockPtr = (uint64_t) CAST_INT calloc( blockCount, sizeof(block_w*) )))
+  if(!(blockPtr = (uint64_t) CAST_INT calloc( blockCount, sizeof(block*) )))
     EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
 
 #if DEBUG_XPVM
@@ -375,7 +373,7 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
  * Used for the XPVM.
  * FIXME FIXME FIXME: This is broken!
  */
-static int getObjLengthXPVM( FILE *fp, uint32_t blockCount, uint64_t *objLength )
+static int getObjLengthXPVM( FILE *fp,uint32_t blockCount, uint64_t *objLength )
 {
   fpos_t *fp_pos = NULL;
   uint32_t cur_length = 0;
@@ -435,28 +433,29 @@ static int readBlockXPVM( FILE *fp, int blockNum )
   fprintf( stderr, "------- Reading block %d from object file. -------\n", 
                    blockNum );
 #endif
-
-  block_w *w = calloc( 1, sizeof(block_w) );
+  char name[256];
+  /*block_w *w = calloc( 1, sizeof(block_w) );
   if( !w )
     EXIT_WITH_ERROR("Error: malloc failed in readBlockXPVM");
   w->type = 1;
-  ((block_w**) CAST_INT blockPtr)[blockNum] = w;
+  ((block_w**) CAST_INT blockPtr)[blockNum] = w;*/
 
-  f_block *b = calloc( 1, sizeof(f_block) );
+  block *b = calloc( 1, sizeof(block) );
   if( !b )
     EXIT_WITH_ERROR("Error: malloc failed in readBlockXPVM");
+  ((block**) CAST_INT blockPtr)[blockNum] = b;
   /* Finally put the function block in the container */
-  w->u.b = b;
+  //w->u.b = b;
   int i = 0;
   /*uint64_t temp = 0;*/
   /* Read name string from block */
-  while( (b->name[i] = fgetc( fp )) && ++i < MAX_NAME_LEN );
+  while( (name[i] = fgetc( fp )) && ++i < MAX_NAME_LEN );
   /* Name too long */
   if( MAX_NAME_LEN == i )
     return 0;
 
 #if DEBUG_XPVM
-  fprintf( stderr, "name: %s\n", b->name );
+  fprintf( stderr, "name: %s\n", name );
 #endif
 
   /* Read trait annotations */
@@ -677,31 +676,38 @@ static void *fetchExecuteXPVM(void *v)
   if( !stack->data )
     EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");
 
+  /*
   block_w *wrapper = calloc( 1, sizeof(block_w) );
   if( !wrapper )
     EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");
   wrapper->type = STACK_FRAME_BLOCK;
-  wrapper->u.sf = stack->data;
-  reg[STACK_FRAME_REG] = (uint64_t) CAST_INT wrapper;
+  wrapper->u.sf = stack->data;*/
 
-  f_block *b = (((block_w**) CAST_INT reg[BLOCK_REG])[0])->u.b;
+  block *b = ((block**) CAST_INT reg[BLOCK_REG])[0];
   if( 0 < b->frame_size )
   {
-    stack->data->block = calloc( 1, sizeof(d_block) + b->frame_size );
+    stack->data->block = calloc( 1, sizeof(block) );
     /* FIXME: Throw OutOfMemory Exception */
     if( !stack->data->block )
       EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM\n");
     stack->data->block->length = b->frame_size;
+    stack->data->block->data = calloc( b->frame_size, sizeof(char) );
   }
-   // stack->data->locals = calloc( b->frame_size, sizeof(char) );
+
   
   /* If work is null, set to pc to the main function in
    * the object file. Otherwise set it to work 
    */
   if( !work )
+  {
     PCX = (uint64_t) CAST_INT b->data;
+    //reg[STACK_FRAME_REG] = (uint64_t) CAST_INT b;
+  }
   else
+  {
     PCX = work;
+  }
+  reg[STACK_FRAME_REG] = (uint64_t) CAST_INT stack->data->block;
 
   /* FIXME */
   /* This currently only supports 10 args */
@@ -779,7 +785,6 @@ static void *fetchExecuteXPVM(void *v)
         free( oldNode->data->block );
         free( oldNode->data );
         free( oldNode );
-        free( wrapper );
       }
       r->status = ret;
       pthread_exit( (void*) CAST_INT r );
@@ -810,7 +815,13 @@ int main( int argc, char **argv )
   if( argc != 2 )
     EXIT_WITH_ERROR("Usage: xpvm one_object_file.obj\n");
 
-  /* load ret_42.obj, Note: this was written by hand in object code */
+  pthread_mutex_init( &malloc_xpvm_mu, NULL );
+
+  pthread_mutex_lock( &malloc_xpvm_mu );
+  malloc_xpvm_init( 10000 );
+  pthread_mutex_unlock( &malloc_xpvm_mu );
+
+
   if (!loadObjectFileXPVM(argv[1], &errorNumber))
     EXIT_WITH_ERROR("loadObjectFileXPVM fails with error %d\n", errorNumber );
 
@@ -822,10 +833,18 @@ int main( int argc, char **argv )
 
   r = (retStruct*) (uint32_t) retVal;
 
-  fprintf( stderr, "r->retVal: %d\n", (int)r->retVal );
+  fprintf( stderr, "r->retVal: %lld\n", (uint64_t)r->retVal );
   fprintf( stderr, "r->status: %d\n", (int)r->status );
 
+  block *ret_b = (block*) CAST_INT r->retVal;
+  fprintf( stderr, "%s\n", ret_b->data );
+
   free( r );
+
+  //pthread_mutex_lock( &malloc_xpvm_mu );
+  //malloc_xpvm_die = 1;
+  //pthread_cond_wait( &malloc_xpvm_ans_cv, &malloc_xpvm_mu );
+  //pthread_mutex_unlock( &malloc_xpvm_mu );
 
   return 0;
 }
