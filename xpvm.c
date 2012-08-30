@@ -23,7 +23,7 @@
 static int readWordXPVM(FILE *fp, uint32_t *outWord);
 static int readBlockXPVM(FILE *fp, int blockNum );
 static int getObjLengthXPVM( FILE *, uint32_t, uint64_t *);
-static void *fetchExecuteXPVM(void *v);
+static void *fetch_execute(void *v);
 
 /* linked list to keep track of (symbol,address) pairs for insymbols
 static struct insymbol {
@@ -49,7 +49,7 @@ static struct opcodeInfoXPVM
 {
   char* opcode;
   int format;
-  int (*formatFunc)( unsigned int proc_id, uint64_t *reg, stackFrame **stack,
+  int (*formatFunc)( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
                      uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
 }
 opcodesXPVM[] =
@@ -251,6 +251,7 @@ void cleanup( void )
 #endif
         //block *b = ((block**) CAST_INT regs[BLOCK_REG])[i];
         block *b = ((block**) CAST_INT blockPtr)[i];
+        //uint8_t *b = (uint8_t*) CAST_INT reg[rj];
         if( b )
         {
 #if DEBUG_XPVM > 1
@@ -448,18 +449,10 @@ static int readBlockXPVM( FILE *fp, int blockNum )
   uint8_t  *b_data              = 0;
   uint8_t  temp                 = 0;
 
-  /*block_w *w = calloc( 1, sizeof(block_w) );
-  if( !w )
-    EXIT_WITH_ERROR("Error: malloc failed in readBlockXPVM");
-  w->type = 1;
-  ((block_w**) CAST_INT blockPtr)[blockNum] = w;*/
-
   block *b = calloc( 1, sizeof(block) );
   if( !b )
     EXIT_WITH_ERROR("Error: malloc failed in readBlockXPVM");
   ((block**) CAST_INT blockPtr)[blockNum] = b;
-  /* Finally put the function block in the container */
-  //w->u.b = b;
   int i = 0;
   /*uint64_t temp = 0;*/
   /* Read name string from block */
@@ -571,14 +564,6 @@ static int readBlockXPVM( FILE *fp, int blockNum )
     fprintf( stderr, "%02x\n", temp );
 #endif
   }
-  /*
-  *(uint32_t*) b_data         = length;
-  *(uint32_t*) (b_data + 4)   = frame_size;
-  *(uint32_t*) (b_data + 8)   = num_except_handlers;
-  *(uint32_t*) (b_data + 12)  = num_outsymbol_refs;
-  *(uint32_t*) (b_data + 16)  = length_aux_data;
-  *(uint64_t*) (b_data + 20)  = annots;
-  *(uint64_t*) (b_data + 28)  = owner;*/
   BLOCK_OWNER( b_data_read )            = owner;
   BLOCK_ANNOTS( b_data_read )           = annots;
   BLOCK_AUX_LENGTH( b_data_read )       = length_aux_data;
@@ -622,7 +607,7 @@ int doInitProc( int64_t *procID, uint64_t work, int argc,
   ar3->work = work;
   ar3->argc = argc;
 
-  if (pthread_create(pt, NULL, fetchExecuteXPVM, (void *) ar3) != 0)
+  if (pthread_create(pt, NULL, fetch_execute, (void *) ar3) != 0)
   {
     perror("error in thread create");
     exit(-1);
@@ -715,15 +700,15 @@ void test_block_macros( uint64_t ptr_as_int )
 }
 
 /*
- * fetchExecuteXPVM
+ * fetch_execute
  *
  * XPVM version of the fetch/execute function
  *
  */
-static void *fetchExecuteXPVM(void *v)
+static void *fetch_execute(void *v)
 {
 #if DEBUG_XPVM
-  fprintf( stderr, "In fetchExecuteXPVM.\n");
+  fprintf( stderr, "In fetch_execute.\n");
 #endif
   /*int i = 0;*/
   feArg *args = (feArg*)v;
@@ -738,56 +723,32 @@ static void *fetchExecuteXPVM(void *v)
   cmdArg *ar1 = NULL, *ar2 = NULL;
   /* Inialize the VM to run */
   uint64_t reg[256];
-  reg[BLOCK_REG] = blockPtr;
+  reg[BLOCK_REG] = blockPtr2;
   //reg[BLOCK_REG] = (uint64_t) CAST_INT blockPtr2;
-  test_block_macros( blockPtr2[0] );
-  stackFrame *stack = calloc( 1, sizeof(stackFrame) );
+  //test_block_macros( blockPtr2[0] );
+  stack_frame *stack = calloc( 1, sizeof(stack_frame) );
   if( !stack )
-    EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");
-  /*stack->data = calloc( 1, sizeof(stackFrame) );
-  if( !stack->data )
-    EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");*/
+    EXIT_WITH_ERROR("Error: malloc failed in fetch_execute");
 
-  /*
-  block_w *wrapper = calloc( 1, sizeof(block_w) );
-  if( !wrapper )
-    EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");
-  wrapper->type = STACK_FRAME_BLOCK;
-  wrapper->u.sf = stack->data;*/
+  uint8_t *b = NULL;
+  if( !work )
+    b = (uint8_t *) CAST_INT ((uint64_t*) CAST_INT reg[BLOCK_REG])[0];
+  else
+    b = (uint8_t*) CAST_INT work;
 
-  /* FIXME?: Will this always be correct?
-   * Need more test cases and find where it breaks.
-   * I'm fairly confident it will.
-   */
-
-  block *b = ((block**) CAST_INT reg[BLOCK_REG])[0];
-  if( 0 < b->frame_size )
+  if( 0 < BLOCK_FRAME_SIZE( b ) )
   {
-    stack->block = calloc( 1, sizeof(block) );
-    /* FIXME: Throw OutOfMemory Exception */
+    stack->block = calloc( BLOCK_FRAME_SIZE( b ) + BLOCK_HEADER_LENGTH, 
+                           sizeof(uint8_t) );
+    // FIXME: Throw OutOfMemory Exception
     if( !stack->block )
-      EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM\n");
-    stack->block->length = b->frame_size;
-    stack->block->data = calloc( b->frame_size, sizeof(char) );
+      EXIT_WITH_ERROR("Error: malloc failed in fetch_execute\n");
+    stack->block = stack->block + BLOCK_HEADER_LENGTH;
+    BLOCK_LENGTH( stack->block ) = BLOCK_FRAME_SIZE( b );
   }
-  //uint8_t *b = (uint8_t *) CAST_INT ((uint64_t*) CAST_INT reg[BLOCK_REG])[0];
-  //if( 0 < BLOCK_FRAME_SIZE( b ) )
-  //{
-  //}
 
   
-  /* If work is null, set to pc to the main function in
-   * the object file. Otherwise set it to work 
-   */
-  if( !work )
-  {
-    PCX = (uint64_t) CAST_INT b->data;
-    //reg[STACK_FRAME_REG] = (uint64_t) CAST_INT b;
-  }
-  else
-  {
-    PCX = work;
-  }
+  PCX = (uint64_t) CAST_INT b;
   reg[STACK_FRAME_REG] = (uint64_t) CAST_INT stack->block;
 
   /* FIXME */
@@ -802,9 +763,6 @@ static void *fetchExecuteXPVM(void *v)
     strcpy( ar2->s, ar1->s );
     reg[i] = (uint64_t) CAST_INT ar2;
   }
-
-  /*stackNode *stack = args->stack;
-  uint64_t *reg = args->regs;*/
 
   /* the processor ID is passed in */
   /*int processorID = args->procNum;*/
@@ -861,11 +819,12 @@ static void *fetchExecuteXPVM(void *v)
       if( 0x74 == opcode )
       {
         r->retVal = reg[stack->retReg];
-        stackFrame *oldFrame = stack;
+        stack_frame *old_frame = stack;
         stack = stack->prev;
-        free( oldFrame->block );
+        if( old_frame->block )
+          free( old_frame->block - BLOCK_HEADER_LENGTH );
         //free( oldNode->data );
-        free( oldFrame );
+        free( old_frame );
       }
       r->status = ret;
       pthread_exit( (void*) CAST_INT r );
@@ -873,7 +832,7 @@ static void *fetchExecuteXPVM(void *v)
     }
     else if (ret != 1)
       EXIT_WITH_ERROR("Error: Unexpected return value from formatFunc"
-                      " in fetchExecuteXPVM\n");
+                      " in fetch_execute\n");
 #if DEBUG_XPVM
     fprintf( stderr, "------- end fetch/execute cycle -------\n");
 #endif
@@ -888,7 +847,7 @@ static void *fetchExecuteXPVM(void *v)
 int main( int argc, char **argv )
 {
   /* error for functions returning from vm520 */
-  int errorNumber = 0;
+  int error_num = 0;
   int64_t ptr = 0;
   retStruct *r = NULL;
   uint64_t retVal = 0;
@@ -903,8 +862,8 @@ int main( int argc, char **argv )
   pthread_mutex_unlock( &malloc_xpvm_mu );
 
 
-  if (!loadObjectFileXPVM(argv[1], &errorNumber))
-    EXIT_WITH_ERROR("loadObjectFileXPVM fails with error %d\n", errorNumber );
+  if (!loadObjectFileXPVM(argv[1], &error_num))
+    EXIT_WITH_ERROR("loadObjectFileXPVM fails with error %d\n", error_num );
 
   doInitProc( &ptr, 0, 0, NULL );
 
@@ -919,16 +878,11 @@ int main( int argc, char **argv )
 
   if( 0 == strcmp( argv[1], "ret_42_malloc.obj" ) )
   {
-    block *ret_b = (block*) CAST_INT r->retVal;
-    fprintf( stderr, "%s\n", ret_b->data );
+    uint8_t *ret_b = (uint8_t*) CAST_INT r->retVal;
+    fprintf( stderr, "%s\n", (char*) ret_b );
   }
 
   free( r );
-
-  //pthread_mutex_lock( &malloc_xpvm_mu );
-  //malloc_xpvm_die = 1;
-  //pthread_cond_wait( &malloc_xpvm_ans_cv, &malloc_xpvm_mu );
-  //pthread_mutex_unlock( &malloc_xpvm_mu );
 
   return 0;
 }

@@ -12,49 +12,36 @@
 #include "xpvm.h"
 
 uint8_t   *allocd_memory;
+uint8_t   *first_block;
 uint8_t   *next_block;
 uint64_t  xpvm_mem_amt;
-
-struct _mem_record
-{
-  uint8_t             *mem;
-  block               *id;
-  struct _mem_record  *link;
-} typedef mem_record;
-
-mem_record *allocd_blocks;
+uint32_t  num_blocks_allocd;
 
 int malloc_xpvm_init( uint64_t bytes )
 {
   allocd_memory = calloc( bytes, sizeof(uint8_t) );
   if( !allocd_memory )
     EXIT_WITH_ERROR("Error: malloc failed in malloc_xpvm_init\n");
-  allocd_blocks = calloc( 1, sizeof(mem_record) );
+
   xpvm_mem_amt = bytes;
   next_block = allocd_memory;
+  num_blocks_allocd = 0;
   return 1;
 }
 
 uint64_t malloc_xpvm( uint32_t bytes )
 {
-  block *b = calloc( 1, sizeof(block) );
-  mem_record *new_rec = calloc( 1, sizeof(mem_record) );
-  if( !b || !new_rec )
-    EXIT_WITH_ERROR("Error: malloc failed in malloc_xpvm\n");
+  uint8_t *b = NULL;
 
-  uint8_t *new_next_block = next_block + bytes + (4-(bytes%4));
+  uint8_t *new_next_block = next_block + bytes + BLOCK_HEADER_LENGTH + 
+                            (4-(bytes%4)); /* Round to next 4 byte boundary */
   if( xpvm_mem_amt - 4 <= new_next_block - allocd_memory )
     EXIT_WITH_ERROR("Error: malloc_xpvm failed. Out of memory.\n");
 
-  b->data = next_block;
+  num_blocks_allocd++;
 
-  allocd_blocks->mem = next_block;
-  allocd_blocks->id = b;
- 
-  new_rec->link = allocd_blocks;
-  allocd_blocks = new_rec;
+  b = next_block + BLOCK_HEADER_LENGTH;
 
-  /* Round up to the next 4-byte boundry */
   next_block = new_next_block;
 
   return (uint64_t) CAST_INT b;

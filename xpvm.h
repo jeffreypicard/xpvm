@@ -75,7 +75,7 @@ int doProcJoin( uint64_t procID, uint64_t *retVal );
  * Struct for a stack frame in the VM.
  */
 typedef struct _block block;
-struct _stackFrame
+struct _stack_frame
 {
   uint64_t      pc;
   uint64_t      cio;
@@ -83,10 +83,10 @@ struct _stackFrame
   uint64_t      reg255;
   uint64_t      retReg;
   //unsigned char *locals;
-  block         *block;
-  struct _stackFrame *prev;
-  //uint8_t     *block;
-} typedef stackFrame;
+  //block         *block;
+  struct _stack_frame *prev;
+  uint8_t     *block;
+} typedef stack_frame;
 
 /*
  * Struct for the VM stack.
@@ -94,7 +94,7 @@ struct _stackFrame
 /*
 struct _stackNode
 {
-  stackFrame        *data;
+  stack_frame        *data;
   struct _stackNode *prev;
 } typedef stackNode;*/
 
@@ -148,14 +148,14 @@ union _block_u
 {
   f_block     *b;
   d_block     *db;
-  stackFrame  *sf;
+  stack_frame  *sf;
 } typedef block_u;
 
 struct _block_w
 {
   // 1: f_block
   // 2: d_block
-  // 3: stackFrame
+  // 3: stack_frame
    
   int     type;
   block_u u;
@@ -180,7 +180,7 @@ struct _retStruct
 } typedef retStruct;
 
 /*
- * Struct for the arguments to the fetchExecute function
+ * Struct for the arguments to the fetch_execute function
  * which is the work function passed to the pthread.
  */
 struct _feArg
@@ -199,7 +199,7 @@ uint64_t malloc_xpvm( uint32_t );
 
 /********************** Opcode Declerations **************************/
 
-#define OPCODE_FUNC ( unsigned int proc_id, uint64_t *reg, stackFrame **stack, \
+#define OPCODE_FUNC ( unsigned int proc_id, uint64_t *reg, stack_frame **stak, \
                     uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
 
 int ldb_2       OPCODE_FUNC
