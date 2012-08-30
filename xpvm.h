@@ -84,16 +84,19 @@ struct _stackFrame
   uint64_t      retReg;
   //unsigned char *locals;
   block         *block;
+  struct _stackFrame *prev;
+  //uint8_t     *block;
 } typedef stackFrame;
 
 /*
  * Struct for the VM stack.
  */
+/*
 struct _stackNode
 {
   stackFrame        *data;
   struct _stackNode *prev;
-} typedef stackNode;
+} typedef stackNode;*/
 
 /*
  * Struct for the blocks read into memory from the object file.
@@ -108,10 +111,26 @@ struct _block
   uint64_t      annots;
   uint64_t      owner;
   //char          name[256];
-  unsigned char *data;
-  unsigned char *aux_data;
+  uint8_t *data;
+  uint8_t *aux_data;
   //struct _block *next;
 } typedef block;
+
+/*
+ * Macros to access the array implementation of the blocks.
+ * Each of these take a uint8_t (unsigned char), access it
+ * at a negative index where the headers are stored and evaluate
+ * to the requested header info.
+ */
+#define BLOCK_OWNER( b ) *(uint64_t*)(b - 8)
+#define BLOCK_ANNOTS( b ) *(uint64_t*)(b - 16)
+#define BLOCK_AUX_LENGTH( b ) *(uint32_t*)(b - 20)
+#define BLOCK_OUT_SYM_REFS( b ) *(uint32_t*)(b - 24)
+#define BLOCK_EXCEPT_HANDLERS( b ) *(uint32_t*)(b - 28)
+#define BLOCK_FRAME_SIZE( b ) *(uint32_t*)(b - 32)
+#define BLOCK_LENGTH( b ) *(uint32_t*)(b - 36)
+
+#define BLOCK_HEADER_LENGTH 36
 
 /*
  * Struct for the blocks that contain only data. 
@@ -180,7 +199,7 @@ uint64_t malloc_xpvm( uint32_t );
 
 /********************** Opcode Declerations **************************/
 
-#define OPCODE_FUNC ( unsigned int proc_id, uint64_t *reg, stackNode **stack, \
+#define OPCODE_FUNC ( unsigned int proc_id, uint64_t *reg, stackFrame **stack, \
                     uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
 
 int ldb_2       OPCODE_FUNC

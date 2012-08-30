@@ -35,6 +35,7 @@ static struct insymbol {
 uint64_t regs[MAX_REGS];
 static uint32_t blockCount = 0;
 uint64_t blockPtr = 0;
+uint64_t *blockPtr2 = 0;
 
 /* 
  * Table of opcodes.
@@ -48,7 +49,7 @@ static struct opcodeInfoXPVM
 {
   char* opcode;
   int format;
-  int (*formatFunc)( unsigned int proc_id, uint64_t *reg, stackNode **stack,
+  int (*formatFunc)( unsigned int proc_id, uint64_t *reg, stackFrame **stack,
                      uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
 }
 opcodesXPVM[] =
@@ -324,6 +325,9 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
     return 0;
   }
 
+  if(!(blockPtr2 = calloc(blockCount, sizeof(uint64_t))))
+    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
+
   if(!(blockPtr = (uint64_t) CAST_INT calloc( blockCount, sizeof(block*) )))
     EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
 
@@ -434,6 +438,16 @@ static int readBlockXPVM( FILE *fp, int blockNum )
                    blockNum );
 #endif
   char name[256];
+  uint32_t length               = 0;
+  uint32_t frame_size           = 0;
+  uint32_t num_except_handlers  = 0;
+  uint32_t num_outsymbol_refs   = 0;
+  uint32_t length_aux_data      = 0;
+  uint64_t annots               = 0;
+  uint64_t owner                = 0;
+  uint8_t  *b_data              = 0;
+  uint8_t  temp                 = 0;
+
   /*block_w *w = calloc( 1, sizeof(block_w) );
   if( !w )
     EXIT_WITH_ERROR("Error: malloc failed in readBlockXPVM");
@@ -460,56 +474,68 @@ static int readBlockXPVM( FILE *fp, int blockNum )
 
   /* Read trait annotations */
   for( i = 0; i < 8; i++ )
-    b->annots |=  ( (uint64_t)fgetc( fp ) << (64 - (i+1)*8) );
+    annots |=  ( (uint64_t)fgetc( fp ) << (64 - (i+1)*8) );
+  //FIXME
+  b->annots = annots;
 
 #if DEBUG_XPVM
-  fprintf( stderr, "annots: %016llx\n", b->annots );
+  fprintf( stderr, "annots: %016llx\n", annots );
 #endif
 
   /* Read frame size */
   for( i = 0; i < 4; i++ )
-    b->frame_size |=  ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+    frame_size |=  ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  //FIXME
+  b->frame_size = frame_size;
 
 #if DEBUG_XPVM
-  fprintf( stderr, "frame_size: %08x\n", b->frame_size );
+  fprintf( stderr, "frame_size: %08x\n", frame_size );
 #endif
 
   /* Read contents length */
   for( i = 0; i < 4; i++ )
-    b->length |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+    length |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  //FIXME
+  b->length = length;
 
 #if DEBUG_XPVM
-  fprintf( stderr, "length: %08x\n", b->length );
+  fprintf( stderr, "length: %08x\n", length );
 #endif
 
   /* Allocate contents */
   b->data = calloc( b->length, sizeof(char) );
-  if( !b->data && b->length )
+  b_data = calloc( length + BLOCK_HEADER_LENGTH, sizeof(uint8_t) );
+  blockPtr2[blockNum] = (uint64_t) CAST_INT (b_data + BLOCK_HEADER_LENGTH);
+  if( !b_data && length )
   {
     fprintf( stderr, "Error: malloc failed in readBlockXPVM\n");
     exit(-1);
   }
 
   /* Read contents */
-  for( i = 0; i < b->length; i++ )
+  uint8_t *b_data_read = b_data + BLOCK_HEADER_LENGTH;
+  for( i = 0; i < length; i++ )
   {
-    b->data[i] = fgetc( fp );
+    b_data_read[i] = fgetc( fp );
+    b->data[i] = b_data_read[i];
 #if DEBUG_XPVM
-    fprintf( stderr, "%02x\n", b->data[i] );
+    fprintf( stderr, "%02x\n", b_data_read[i] );
 #endif
   }
 
   /* Read number of exception handlers */
   for( i = 0; i < 4; i++ )
-    b->num_except_handlers |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+    num_except_handlers |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  b->num_except_handlers = num_except_handlers;
 
 #if DEBUG_XPVM
-  fprintf( stderr, "num_except_handlers: %08x\n", b->num_except_handlers );
+  fprintf( stderr, "num_except_handlers: %08x\n", num_except_handlers );
 #endif
 
   /* Read number of outsymbol references */
   for( i = 0; i < 4; i++ )
-    b->num_outsymbol_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+    num_outsymbol_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  b->num_outsymbol_refs = num_outsymbol_refs;
 
 #if DEBUG_XPVM
   fprintf( stderr, "num_outsymbol_refs: %08x\n", b->num_outsymbol_refs );
@@ -517,28 +543,52 @@ static int readBlockXPVM( FILE *fp, int blockNum )
 
   /* Read length of auxiliary data */
   for( i = 0; i < 4; i++ )
-    b->length_aux_data |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+    length_aux_data |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  b->length_aux_data = length_aux_data;
 
 #if DEBUG_XPVM
   fprintf( stderr, "length_aux_data: %08x\n", b->length_aux_data );
 #endif
 
   /* Allocate auxiliary data */
-  b->aux_data = calloc( b->length_aux_data, sizeof(char) );
+  
+  /*
+  aux_data = calloc( b->length_aux_data, sizeof(char) );
   if( !b->aux_data && b->length_aux_data )
   {
     fprintf( stderr, "Error: malloc failed in readBlockXPVM\n");
     exit(-1);
-  }
+  }*/
 
   /* Read auxiliary data */
-  for( i = 0; i < b->length_aux_data; i++ )
-  {
-    b->aux_data[i] = fgetc( fp );
 #if DEBUG_XPVM
-    fprintf( stderr, "%02x\n", b->aux_data[i] );
+    fprintf( stderr, "Skipping aux data.\n");
+#endif
+  for( i = 0; i < length_aux_data; i++ )
+  {
+    temp = fgetc( fp );
+#if DEBUG_XPVM
+    fprintf( stderr, "%02x\n", temp );
 #endif
   }
+  /*
+  *(uint32_t*) b_data         = length;
+  *(uint32_t*) (b_data + 4)   = frame_size;
+  *(uint32_t*) (b_data + 8)   = num_except_handlers;
+  *(uint32_t*) (b_data + 12)  = num_outsymbol_refs;
+  *(uint32_t*) (b_data + 16)  = length_aux_data;
+  *(uint64_t*) (b_data + 20)  = annots;
+  *(uint64_t*) (b_data + 28)  = owner;*/
+  BLOCK_OWNER( b_data_read )            = owner;
+  BLOCK_ANNOTS( b_data_read )           = annots;
+  BLOCK_AUX_LENGTH( b_data_read )       = length_aux_data;
+  BLOCK_OUT_SYM_REFS( b_data_read )     = num_outsymbol_refs;
+  BLOCK_EXCEPT_HANDLERS( b_data_read )  = num_except_handlers;
+  BLOCK_FRAME_SIZE( b_data_read )       = frame_size;
+  BLOCK_LENGTH( b_data_read )           = length;
+
+
+  /* TODO Add this block to the VM memory. */
 
 #if DEBUG_XPVM
   fprintf( stderr, "------- Block %d successfully "
@@ -643,6 +693,26 @@ uint32_t assembleInst( unsigned char *pc )
   return inst;
 }
 
+void test_block_macros( uint64_t ptr_as_int )
+{
+  uint8_t *b = (uint8_t *) CAST_INT ptr_as_int;
+
+  fprintf( stderr, "Block Headers.\n"
+                   "owner:            %llx\n"
+                   "annots:           %llx\n"
+                   "aux_length:       %x\n"
+                   "out_sym_refs:     %x\n"
+                   "except_handlers:  %x\n"
+                   "frame_size:       %x\n"
+                   "length:           %x\n",
+                   BLOCK_OWNER( b ),
+                   BLOCK_ANNOTS( b ),
+                   BLOCK_AUX_LENGTH( b ),
+                   BLOCK_OUT_SYM_REFS( b ),
+                   BLOCK_EXCEPT_HANDLERS( b ),
+                   BLOCK_FRAME_SIZE( b ),
+                   BLOCK_LENGTH( b ) );
+}
 
 /*
  * fetchExecuteXPVM
@@ -669,12 +739,14 @@ static void *fetchExecuteXPVM(void *v)
   /* Inialize the VM to run */
   uint64_t reg[256];
   reg[BLOCK_REG] = blockPtr;
-  stackNode *stack = calloc( 1, sizeof(stackNode) );
+  //reg[BLOCK_REG] = (uint64_t) CAST_INT blockPtr2;
+  test_block_macros( blockPtr2[0] );
+  stackFrame *stack = calloc( 1, sizeof(stackFrame) );
   if( !stack )
     EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");
-  stack->data = calloc( 1, sizeof(stackFrame) );
+  /*stack->data = calloc( 1, sizeof(stackFrame) );
   if( !stack->data )
-    EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");
+    EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM");*/
 
   /*
   block_w *wrapper = calloc( 1, sizeof(block_w) );
@@ -683,16 +755,25 @@ static void *fetchExecuteXPVM(void *v)
   wrapper->type = STACK_FRAME_BLOCK;
   wrapper->u.sf = stack->data;*/
 
+  /* FIXME?: Will this always be correct?
+   * Need more test cases and find where it breaks.
+   * I'm fairly confident it will.
+   */
+
   block *b = ((block**) CAST_INT reg[BLOCK_REG])[0];
   if( 0 < b->frame_size )
   {
-    stack->data->block = calloc( 1, sizeof(block) );
+    stack->block = calloc( 1, sizeof(block) );
     /* FIXME: Throw OutOfMemory Exception */
-    if( !stack->data->block )
+    if( !stack->block )
       EXIT_WITH_ERROR("Error: malloc failed in fetchExecuteXPVM\n");
-    stack->data->block->length = b->frame_size;
-    stack->data->block->data = calloc( b->frame_size, sizeof(char) );
+    stack->block->length = b->frame_size;
+    stack->block->data = calloc( b->frame_size, sizeof(char) );
   }
+  //uint8_t *b = (uint8_t *) CAST_INT ((uint64_t*) CAST_INT reg[BLOCK_REG])[0];
+  //if( 0 < BLOCK_FRAME_SIZE( b ) )
+  //{
+  //}
 
   
   /* If work is null, set to pc to the main function in
@@ -707,7 +788,7 @@ static void *fetchExecuteXPVM(void *v)
   {
     PCX = work;
   }
-  reg[STACK_FRAME_REG] = (uint64_t) CAST_INT stack->data->block;
+  reg[STACK_FRAME_REG] = (uint64_t) CAST_INT stack->block;
 
   /* FIXME */
   /* This currently only supports 10 args */
@@ -779,12 +860,12 @@ static void *fetchExecuteXPVM(void *v)
       /* Check if ret was called */
       if( 0x74 == opcode )
       {
-        r->retVal = reg[stack->data->retReg];
-        stackNode *oldNode = stack;
+        r->retVal = reg[stack->retReg];
+        stackFrame *oldFrame = stack;
         stack = stack->prev;
-        free( oldNode->data->block );
-        free( oldNode->data );
-        free( oldNode );
+        free( oldFrame->block );
+        //free( oldNode->data );
+        free( oldFrame );
       }
       r->status = ret;
       pthread_exit( (void*) CAST_INT r );
@@ -836,8 +917,11 @@ int main( int argc, char **argv )
   fprintf( stderr, "r->retVal: %lld\n", (uint64_t)r->retVal );
   fprintf( stderr, "r->status: %d\n", (int)r->status );
 
-  block *ret_b = (block*) CAST_INT r->retVal;
-  fprintf( stderr, "%s\n", ret_b->data );
+  if( 0 == strcmp( argv[1], "ret_42_malloc.obj" ) )
+  {
+    block *ret_b = (block*) CAST_INT r->retVal;
+    fprintf( stderr, "%s\n", ret_b->data );
+  }
 
   free( r );
 
