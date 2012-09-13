@@ -9,3 +9,5 @@ xpvm
 
 # object files
 *.o
+# library files
+*.so

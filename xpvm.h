@@ -16,19 +16,21 @@
 
 #define DEBUG_XPVM 1
 
-#define MAX_REGS 256
-#define MAX_NAME_LEN 256
+#define MAX_REGS      256
+#define HIDDEN_REGS   4
+#define NUM_REGS      MAX_REGS + HIDDEN_REGS
+#define MAX_NAME_LEN  256
 
-uint64_t CIO;
-uint64_t CIB;
+//uint64_t CIO;
+//uint64_t CIB;
 
 #define PCX reg[253]
 #define PC_REG 253
-#define CIO_REG 253
-//#define CIO reg[CIO_REG]
-#define CIB_REG 252
-//#define CBO reg[CBO_REG]
-#define BLOCK_REG 254
+#define CIO_REG 256
+#define CIO reg[CIO_REG]
+#define CIB_REG 257
+#define CIB reg[CIB_REG]
+#define BLOCK_REG 258
 #define STACK_FRAME_REG 255
 
 #define CAST_INT (uint32_t)
@@ -41,9 +43,9 @@ uint64_t CIB;
 }                                 \
 
 /* Definition for block types */
-#define FUNCTION_BLOCK 1
-#define DATA_BLOCK 2
-#define STACK_FRAME_BLOCK 3
+//#define FUNCTION_BLOCK 1
+//#define DATA_BLOCK 2
+//#define STACK_FRAME_BLOCK 3
 
 // maximum number of processors
 #define VM520_MAX_PROCESSORS 16
@@ -66,7 +68,7 @@ uint64_t CIB;
 int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber );
 
 int doInitProc( int64_t *retVal, uint64_t work, int argc, 
-                 uint64_t *regBank );
+                 uint64_t *reg_bank );
 int doProcJoin( uint64_t procID, uint64_t *retVal );
 
 /************************** Structs *********************************/
@@ -133,34 +135,20 @@ struct _block
 #define BLOCK_HEADER_LENGTH 36
 
 /*
- * Struct for the blocks that contain only data. 
+ * Macros defining masks used in checking annotations
  */
+#define MX_PRIVATE_MASK   0x0100000000000000
+#define MX_RD_ONLY_MASK   0x0200000000000000
+#define MX_LCK_RQD_MASK   0x0300000000000000
+
+#define UNKNOWABLE_MASK   0x0000000000000001
+#define INST_MASK         0x0000000000000002
+
 /*
-struct _d_block
-{
-  uint32_t      length;
-  uint64_t      annots;
-  uint64_t      owner;
-  unsigned char data[0]; 
-} typedef d_block;
+ * Macros for checking annotations
+ */
+#define CHECK_INST_ANNOT( b ) INST_MASK & BLOCK_ANNOTS( b )
 
-union _block_u
-{
-  f_block     *b;
-  d_block     *db;
-  stack_frame  *sf;
-} typedef block_u;
-
-struct _block_w
-{
-  // 1: f_block
-  // 2: d_block
-  // 3: stack_frame
-   
-  int     type;
-  block_u u;
-} typedef block_w;
-*/
 /*
  * Struct to hold the arguments passed to doProcInit.
  */
@@ -183,12 +171,12 @@ struct _retStruct
  * Struct for the arguments to the fetch_execute function
  * which is the work function passed to the pthread.
  */
-struct _feArg
+struct _fe_args
 {
-  uint64_t *regBank;
+  uint64_t *reg_bank;
   uint64_t work;
   int argc;
-} typedef feArg;
+} typedef fe_args;
 
 /*
  * Allocator function and mutex.
@@ -197,7 +185,13 @@ pthread_mutex_t malloc_xpvm_mu;
 int malloc_xpvm_init( uint64_t );
 uint64_t malloc_xpvm( uint32_t );
 
-/********************** Opcode Declerations **************************/
+/*
+ * Dynamic link handle.
+ */
+#define C_LIB_PATH "./wrapped_c_lib.so"
+void *__lh;
+
+/********************** Opcode Declarations **************************/
 
 #define OPCODE_FUNC ( unsigned int proc_id, uint64_t *reg, stack_frame **stak, \
                     uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
@@ -221,6 +215,9 @@ int mull_36     OPCODE_FUNC
 int malloc_96   OPCODE_FUNC
 int ldfunc_112  OPCODE_FUNC
 int call_114    OPCODE_FUNC
+int calln_115   OPCODE_FUNC
 int ret_116     OPCODE_FUNC
+
+/*************************** Native functions ****************************/
 
 #endif

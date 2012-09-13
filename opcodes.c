@@ -9,8 +9,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <dlfcn.h>
 
 #include "xpvm.h"
+
+char *native_funcs[] =
+{
+  "print_int",
+};
+
 
 int ldb_2( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
@@ -217,6 +224,34 @@ int std_26( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 int std_27( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
+  return 1;
+}
+
+int ldblkid_28( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
+                uint8_t opcode, uint8_t ri, uint8_t c3, uint8_t c4 )
+{
+  uint16_t const16 = TWO_8_TO_16( c3, c4 );
+  /*FIXME: Check index against f_block count */
+  uint8_t *b = (uint8_t*) CAST_INT 
+               ((uint64_t*) CAST_INT reg[BLOCK_REG])[const16];
+#if DEBUG_XPVM
+  fprintf( stderr, "\tldblkid: b: %p\n", b );
+#endif
+  reg[ri] = (uint64_t) CAST_INT b;
+  return 1;
+}
+
+int ldnative_29( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
+                uint8_t opcode, uint8_t ri, uint8_t c3, uint8_t c4 )
+{
+  uint16_t const16 = TWO_8_TO_16( c3, c4 );
+  /*FIXME: Check index against f_block count */
+  uint8_t *b = (uint8_t*) CAST_INT 
+               ((uint64_t*) CAST_INT reg[BLOCK_REG])[const16];
+#if DEBUG_XPVM
+  fprintf( stderr, "\tldnative: b: %p\n", b );
+#endif
+  reg[ri] = (uint64_t) CAST_INT b;
   return 1;
 }
 
@@ -603,6 +638,9 @@ int call_114( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   fprintf( stderr, "\tcall: b: %p\n", b );
 #endif
   /*FIXME: Check annots for executable */
+  fprintf( stderr, "INST_MASK: %lld\n", (uint64_t) INST_MASK );
+  if( ! (CHECK_INST_ANNOT(b)) )
+    EXIT_WITH_ERROR("Error: block does not have the instruction annotation!\n");
   stack_frame *f = calloc( 1, sizeof(stack_frame) );
   /* FIXME: Throw OutOfMemory Exception */
   if( !f )
@@ -629,13 +667,38 @@ int call_114( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   *stack = f;
   reg[STACK_FRAME_REG] = (uint64_t) CAST_INT f->block;
   reg[PC_REG] = (uint64_t) CAST_INT b;
+  CIB = (uint64_t) CAST_INT b;
+  CIO = 0;
 
   return 1;
 }
 
+/* FIXME:
+ * This is wrong. The user first needs to load the native function into
+ * a register then pass the actual function pointer to this opcode
+ * and then it is called.
+ * FIXME:
+ */
 int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t ri, uint8_t rj, uint8_t c3, uint8_t const8 )
 {
+  char *name = native_funcs[reg[ri]];
+  char *error = NULL;
+  int i = 0;
+  int (*fp)( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
+                     uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+#if DEBUG_XPVM
+  fprintf( stderr, "name: %s\n", name );
+#endif
+
+  fp = dlsym( __lh, name );
+  if( (error = dlerror()) != NULL )
+    EXIT_WITH_ERROR("Error: dlsym failed in calln_115\n");
+
+  i = (*fp)( proc_id, reg, stack, ri, rj, c3, const8 );
+  if( !i )
+    return 0;
+
   return 1;
 }
 
