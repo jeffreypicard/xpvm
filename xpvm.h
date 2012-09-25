@@ -33,6 +33,8 @@
 #define BLOCK_REG 258
 #define STACK_FRAME_REG 255
 
+#define RET_OPCODE 0x74
+
 #define CAST_INT (uint32_t)
 
 #define TWO_8_TO_16( b1, b2 ) ((uint16_t)b1 << 8) | b2
@@ -125,14 +127,16 @@ struct _block
  * to the requested header info.
  */
 #define BLOCK_OWNER( b ) *(uint64_t*)(b - 8)
-#define BLOCK_ANNOTS( b ) *(uint64_t*)(b - 16)
-#define BLOCK_AUX_LENGTH( b ) *(uint32_t*)(b - 20)
-#define BLOCK_OUT_SYM_REFS( b ) *(uint32_t*)(b - 24)
-#define BLOCK_EXCEPT_HANDLERS( b ) *(uint32_t*)(b - 28)
-#define BLOCK_FRAME_SIZE( b ) *(uint32_t*)(b - 32)
-#define BLOCK_LENGTH( b ) *(uint32_t*)(b - 36)
+#define BLOCK_LOCKED_LIST( b ) *(uint64_t*)(b - 16)
+#define BLOCK_ANNOTS( b ) *(uint64_t*)(b - 24)
+#define BLOCK_AUX_LENGTH( b ) *(uint32_t*)(b - 28)
+#define BLOCK_OUT_SYM_REFS( b ) *(uint32_t*)(b - 32)
+#define BLOCK_EXCEPT_HANDLERS( b ) *(uint32_t*)(b - 36)
+#define BLOCK_NATIVE_REFS( b ) *(uint32_t*)(b - 40)
+#define BLOCK_FRAME_SIZE( b ) *(uint32_t*)(b - 44)
+#define BLOCK_LENGTH( b ) *(uint32_t*)(b - 48)
 
-#define BLOCK_HEADER_LENGTH 36
+#define BLOCK_HEADER_LENGTH 48
 
 /*
  * Macros defining masks used in checking annotations

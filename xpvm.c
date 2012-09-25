@@ -447,6 +447,7 @@ static int read_block( FILE *fp, int block_num )
   uint32_t length               = 0;
   uint32_t frame_size           = 0;
   uint32_t num_except_handlers  = 0;
+  uint32_t num_native_refs      = 0;
   uint32_t num_outsymbol_refs   = 0;
   uint32_t length_aux_data      = 0;
   uint64_t annots               = 0;
@@ -520,6 +521,11 @@ static int read_block( FILE *fp, int block_num )
   for( i = 0; i < 4; i++ )
     num_outsymbol_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
 
+  /* Read number of native function references */
+  /*
+  for( i = 0; i < 4; i++ )
+    num_native_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
+
 #if DEBUG_XPVM
   fprintf( stderr, "num_outsymbol_refs: %08x\n", num_outsymbol_refs );
 #endif
@@ -558,6 +564,7 @@ static int read_block( FILE *fp, int block_num )
   BLOCK_AUX_LENGTH( b_data_read )       = length_aux_data;
   BLOCK_OUT_SYM_REFS( b_data_read )     = num_outsymbol_refs;
   BLOCK_EXCEPT_HANDLERS( b_data_read )  = num_except_handlers;
+  /*BLOCK_NATIVE_REFS( b_data_read )      = num_native_refs;*/
   BLOCK_FRAME_SIZE( b_data_read )       = frame_size;
   BLOCK_LENGTH( b_data_read )           = length;
 
@@ -652,7 +659,7 @@ static int readWordXPVM(FILE *fp, uint32_t *outWord)
 #define SP reg[14]
 #define FP reg[13]
 
-uint32_t assembleInst( unsigned char *pc )
+uint32_t assembleInst( uint8_t *pc )
 {
   uint8_t c1 = pc[0];
   uint8_t c2 = pc[1];
@@ -743,7 +750,7 @@ static void *fetch_execute(void *v)
 
   /* FIXME */
   /* This currently only supports 10 args */
-  for( i = 0; i < argc && i < 10; i++ )
+  for( i = 1; i < argc && i < 11; i++ )
   {
     ar1 = ((cmdArg*) CAST_INT (reg_bank+i));
     len = strlen( ar1->s );
@@ -810,7 +817,7 @@ static void *fetch_execute(void *v)
     if (ret <= 0)
     {
       /* Check if ret was called */
-      if( 0x74 == opcode )
+      if( RET_OPCODE == opcode )
       {
         r->retVal = reg[stack->retReg];
         stack_frame *old_frame = stack;

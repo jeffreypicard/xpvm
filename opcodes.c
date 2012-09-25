@@ -680,7 +680,7 @@ int call_114( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
  * FIXME:
  */
 int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t ri, uint8_t rj, uint8_t c3, uint8_t const8 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   char *name = native_funcs[reg[ri]];
   char *error = NULL;
@@ -695,7 +695,7 @@ int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( (error = dlerror()) != NULL )
     EXIT_WITH_ERROR("Error: dlsym failed in calln_115\n");
 
-  i = (*fp)( proc_id, reg, stack, ri, rj, c3, const8 );
+  i = (*fp)( proc_id, reg, stack, opcode, ri, rj, const8 );
   if( !i )
     return 0;
 

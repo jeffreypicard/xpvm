@@ -10,8 +10,8 @@ all: xpvm
 ret_42: xpvm.o ret_42.o ret_42.obj
 	$(CC) $(CFLAGS) opcodes.o xpvm.o ret_42.o -o ret_42
 
-xpvm: xpvm.o opcodes.o allocator.o wrapped_c_lib.so
-	$(CC) $(CFLAGS) -rdynamic xpvm.o opcodes.o allocator.o -o xpvm -ldl
+xpvm: xpvm.o opcodes.o allocator.o wrapped_c_lib.so print_int.o
+	$(CC) $(CFLAGS) -rdynamic xpvm.o opcodes.o allocator.o print_int.o -o xpvm -ldl
 
 xpvm.o: xpvm.c xpvm.h opcodes.o
 	$(CC) $(CFLAGS) -c xpvm.c
@@ -30,6 +30,10 @@ wrapped_c_lib.o: wrapped_c_lib.c
 
 ret_42.o: ret_42.c xpvm.h
 	$(CC) $(CFLAGS) -c ret_42.c
+
+# Assembly functions
+print_int.o:	print_int.s
+	$(CC) $(CFLAGS) -c $^
 
 .PHONY: clean test
 

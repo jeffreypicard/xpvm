@@ -7,6 +7,9 @@ inst_disassemble
 ret_42
 xpvm
 
+# vim temp files
+*.swp
+*.swo
 # object files
 *.o
 # library files
