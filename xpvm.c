@@ -4,7 +4,7 @@
  * Implementation of the XPVM.
  *
  * Author: Jeffrey Picard
- * Heavily based on Professor Hatcher's vm520.
+ * Based on Professor Hatcher's vm520.
  */
 
 #include <stdio.h>
@@ -12,6 +12,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#define _GNU_SOURCE
 #include <pthread.h>
 #include <dlfcn.h>
 
@@ -21,10 +22,11 @@
 #include "xpvm.h"
 
 /* forward references */
-static int readWordXPVM(FILE *fp, uint32_t *outWord);
+static int read_word(FILE *fp, uint32_t *outWord);
 static int read_block(FILE *fp, int block_num );
 static int verify_obj_format( FILE *, uint32_t, uint64_t *);
 static void *fetch_execute(void *v);
+void test_block_macros( uint64_t ptr_as_int );
 
 /* linked list to keep track of (symbol,address) pairs for insymbols
 static struct insymbol {
@@ -46,14 +48,14 @@ uint64_t *block_ptr = 0;
  *    implementation of the opcode.
  */
 #define MAX_OPCODE_XPVM 150
-static struct opcodeInfoXPVM
+static struct opcode_info
 {
   char* opcode;
   int format;
   int (*formatFunc)( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
                      uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
 }
-opcodesXPVM[] =
+opcodes[] =
 {
 {"0",         0, NULL},        /* 0 */
 {"1",         0, NULL},        /* 1 */
@@ -88,7 +90,7 @@ opcodesXPVM[] =
 {"30",        0, NULL},        /* 30 */
 {"31",        0, NULL},        /* 31 */
 {"addl",      1, addl_32},     /* 32 */
-{"addl",      2, NULL}, /* 33 */
+{"addl",      2, addl_33}, /* 33 */
 {"subl",      1, subl_34},     /* 34 */
 {"subl",      2, NULL}, /* 35 */
 {"mull",      1, mull_36},     /* 36 */
@@ -98,12 +100,12 @@ opcodesXPVM[] =
 {"reml",      1, NULL}, /* 40 */
 {"reml",      2, NULL}, /* 41 */
 {"negl",      1, NULL}, /* 42 */
-{"addd",      1, NULL}, /* 43 */
+{"addd",      1, addd_43}, /* 43 */
 {"subd",      1, NULL}, /* 44 */
-{"muld",      1, NULL}, /* 45 */
-{"divd",      1, NULL}, /* 46 */
+{"muld",      1, muld_45}, /* 45 */
+{"divd",      1, divd_46}, /* 46 */
 {"negd",      1, NULL}, /* 47 */
-{"cvtld",     1, NULL}, /* 48 */
+{"cvtld",     1, cvtld_48}, /* 48 */
 {"cvtdl",     1, NULL}, /* 49 */
 {"lshift",    1, NULL}, /* 50 */
 {"lshift",    2, NULL}, /* 51 */
@@ -123,7 +125,7 @@ opcodesXPVM[] =
 {"cmpeq",     2, NULL}, /* 65 */
 {"cmple",     1, NULL}, /* 66 */
 {"cmple",     2, NULL}, /* 67 */
-{"cmplt",     1, NULL}, /* 68 */
+{"cmplt",     1, cmplt_68}, /* 68 */
 {"cmplt",     2, NULL}, /* 69 */
 {"cmpule",    1, NULL}, /* 70 */
 {"cmpule",    2, NULL}, /* 71 */
@@ -135,10 +137,10 @@ opcodesXPVM[] =
 {"77",        0, NULL},        /* 77 */
 {"78",        0, NULL},        /* 78 */
 {"79",        0, NULL},        /* 79 */
-{"jmp",       3, NULL}, /* 80 */
+{"jmp",       3, jmp_80}, /* 80 */
 {"jmp",       1, NULL}, /* 81 */
-{"btrue",     3, NULL}, /* 82 */
-{"bfalse",    3, NULL}, /* 83 */
+{"btrue",     3, btrue_82}, /* 82 */
+{"bfalse",    3, bfalse_83}, /* 83 */
 {"84",        0, NULL},        /* 84 */
 {"85",        0, NULL},        /* 85 */
 {"86",        0, NULL},        /* 86 */
@@ -233,7 +235,7 @@ uint32_t reverseEndianness( uint32_t toRev )
 /*
  * cleanup
  *
- * This function is passed to atexit in the loadObjectFileXPVM
+ * This function is passed to atexit in the load_object_file
  * function. It cleans up all the memory used when loading the
  * object file.
  */
@@ -281,7 +283,7 @@ int load_c_lib( void )
  */
 
 /*
- * loadObjectFileXPVM
+ * load_object_file
  *
  * Loads an object file for the XPVM
  *
@@ -294,7 +296,7 @@ int load_c_lib( void )
  *    -2: file contains outsymbols
  *    -3: file is not a valid object file
  */
-int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
+int32_t load_object_file( char *filename, int32_t *errorNumber )
 {
   FILE *fp;
   //uint64_t objLength = 0;
@@ -315,7 +317,7 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
   }
 
   /* read headers */
-  if( !readWordXPVM( fp, (uint32_t*) &magic ) )
+  if( !read_word( fp, (uint32_t*) &magic ) )
   {
     *errorNumber = -3;
     return 0;
@@ -328,14 +330,14 @@ int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber )
     *errorNumber = -3;
     return 0;
   }
-  if( !readWordXPVM( fp, (uint32_t *) &block_cnt ) )
+  if( !read_word( fp, (uint32_t *) &block_cnt ) )
   {
     *errorNumber = -3;
     return 0;
   }
 
   if(!(block_ptr = calloc(block_cnt, sizeof(uint64_t))))
-    EXIT_WITH_ERROR("Error: malloc failed in loadObjectFileXPVM");
+    EXIT_WITH_ERROR("Error: malloc failed in load_object_file");
 
 #if DEBUG_XPVM
   fprintf(stderr, "block_cnt: %d\n", block_cnt );
@@ -396,16 +398,20 @@ static int verify_obj_format(FILE *fp,uint32_t block_cnt,uint64_t *objLength)
   }
 
   /* Save the current position in the file. */
+#if DEBUG_XPVM
   fprintf( stderr, "In getObjLength\n");
+#endif
   if( 0 > fgetpos( fp, fp_pos ) )
     return 0;
 
+#if DEBUG_XPVM
   fprintf( stderr, "After intial read\n");
+#endif
 
   *objLength = 0;
   for( i = 0; i < block_cnt; i++ )
   {
-    if( !readWordXPVM( fp, &cur_length ) )
+    if( !read_word( fp, &cur_length ) )
       return 0;
 #if DEBUG_XPVM
     fprintf( stderr, "cur_length: %d\n", cur_length );    
@@ -415,7 +421,9 @@ static int verify_obj_format(FILE *fp,uint32_t block_cnt,uint64_t *objLength)
     *objLength += cur_length;
   }
 
+#if DEBUG_XPVM
   fprintf( stderr, "After objLength calculation\n");
+#endif
 
   /* Return the file reading to its original position */
   if( 0 > fsetpos( fp, fp_pos ) )
@@ -423,7 +431,9 @@ static int verify_obj_format(FILE *fp,uint32_t block_cnt,uint64_t *objLength)
 
   free( fp_pos );
 
+#if DEBUG_XPVM
   fprintf( stderr, "Leaving getObjLength\n");
+#endif
 
   return 1;
 }
@@ -453,7 +463,9 @@ static int read_block( FILE *fp, int block_num )
   uint64_t annots               = 0;
   uint64_t owner                = 0;
   uint8_t  *b_data              = 0;
+#if DEBUG_XPVM
   uint8_t  temp                 = 0;
+#endif
 
   int i = 0;
   /* Read name string from block */
@@ -522,9 +534,9 @@ static int read_block( FILE *fp, int block_num )
     num_outsymbol_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
 
   /* Read number of native function references */
-  /*
+ 
   for( i = 0; i < 4; i++ )
-    num_native_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
+    num_native_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
 
 #if DEBUG_XPVM
   fprintf( stderr, "num_outsymbol_refs: %08x\n", num_outsymbol_refs );
@@ -554,9 +566,11 @@ static int read_block( FILE *fp, int block_num )
 #endif
   for( i = 0; i < length_aux_data; i++ )
   {
-    temp = fgetc( fp );
 #if DEBUG_XPVM
+    temp = fgetc( fp );
     fprintf( stderr, "%02x\n", temp );
+#else
+    fgetc(fp);
 #endif
   }
   BLOCK_OWNER( b_data_read )            = owner;
@@ -564,9 +578,11 @@ static int read_block( FILE *fp, int block_num )
   BLOCK_AUX_LENGTH( b_data_read )       = length_aux_data;
   BLOCK_OUT_SYM_REFS( b_data_read )     = num_outsymbol_refs;
   BLOCK_EXCEPT_HANDLERS( b_data_read )  = num_except_handlers;
-  /*BLOCK_NATIVE_REFS( b_data_read )      = num_native_refs;*/
+  BLOCK_NATIVE_REFS( b_data_read )      = num_native_refs;
   BLOCK_FRAME_SIZE( b_data_read )       = frame_size;
   BLOCK_LENGTH( b_data_read )           = length;
+
+  /*test_block_macros( b_data_read );*/
 
 
   /* TODO Add this block to the VM memory. */
@@ -581,13 +597,13 @@ static int read_block( FILE *fp, int block_num )
 }
 
 /*
- * doInitProc
+ * do_init_proc
  *
  * C function implementation of the initProc
  * opcode. also used to start the VM executing
  * the main function.
  */
-int doInitProc( int64_t *procID, uint64_t work, int argc, 
+int do_init_proc( uint64_t *proc_id, uint64_t work, int argc, 
                  uint64_t *reg_bank )
 {
   pthread_t *pt = calloc( 1, sizeof(pthread_t) );
@@ -598,7 +614,7 @@ int doInitProc( int64_t *procID, uint64_t work, int argc,
 
   fe_args *ar3 = calloc( 1, sizeof(fe_args) );
   if( !ar3 )
-    EXIT_WITH_ERROR("Error: malloc failed in doInitProc\n");
+    EXIT_WITH_ERROR("Error: malloc failed in do_init_proc\n");
   ar3->reg_bank = reg_bank;
   ar3->work = work;
   ar3->argc = argc;
@@ -609,22 +625,37 @@ int doInitProc( int64_t *procID, uint64_t work, int argc,
     exit(-1);
   }
 
-  *procID = (uint64_t) CAST_INT pt;
+  *proc_id = (uint64_t) CAST_INT pt;
 
   return 0;
 }
 
-int doProcJoin( uint64_t procID, uint64_t *retVal )
+int do_proc_join( uint64_t proc_id, uint64_t *ret_val )
 {
-  pthread_t *pt = (pthread_t*) CAST_INT procID;
+  pthread_t *pt = (pthread_t*) CAST_INT proc_id;
   void *ret;
   if (pthread_join(*pt, &ret) != 0)
   {
     perror("error in thread join");
     exit(-1);
   }
-  *retVal = (uint64_t) CAST_INT ret;
+  *ret_val = (uint64_t) CAST_INT ret;
   free( pt );
+
+  return 0;
+}
+
+int do_join2( uint64_t proc_id, uint64_t *ret_val )
+{
+  pthread_t *pt = (pthread_t*) CAST_INT proc_id;
+  void *ret;
+  if (pthread_tryjoin_np(*pt, &ret) != 0)
+  {
+    perror("error in thread join");
+    exit(-1);
+  }
+  *ret_val = (uint64_t) CAST_INT ret;
+  //free( pt );
 
   return 0;
 }
@@ -634,13 +665,13 @@ int doProcJoin( uint64_t procID, uint64_t *retVal )
  */
 
 /*
- * readWordXPVM
+ * read_word
  *
  * Reads a word (32 bits) from the object file and
  * returns it through the second parameter.
  * returns 0 on EOF.
  */
-static int readWordXPVM(FILE *fp, uint32_t *outWord)
+static int read_word(FILE *fp, uint32_t *outWord)
 {
   int c1 = getc(fp);
   int c2 = getc(fp);
@@ -659,30 +690,33 @@ static int readWordXPVM(FILE *fp, uint32_t *outWord)
 #define SP reg[14]
 #define FP reg[13]
 
-uint32_t assembleInst( uint8_t *pc )
+uint32_t assemble_inst( uint8_t *pc )
 {
   uint8_t c1 = pc[0];
   uint8_t c2 = pc[1];
   uint8_t c3 = pc[2];
   uint8_t c4 = pc[3];
+#if DEBUG_XPVM
   fprintf( stderr, "\tc1: %02x\n"
                    "\tc2: %02x\n"
                    "\tc3: %02x\n"
                    "\tc4: %02x\n",
                    c1,c2,c3,c4);
+#endif
   uint32_t inst = (c1 << 24) | (c2 << 16) | (c3 << 8) | c4;
   return inst;
 }
 
 void test_block_macros( uint64_t ptr_as_int )
 {
+#if DEBUG_XPVM
   uint8_t *b = (uint8_t *) CAST_INT ptr_as_int;
-
   fprintf( stderr, "Block Headers.\n"
                    "owner:            %llx\n"
                    "annots:           %llx\n"
                    "aux_length:       %x\n"
                    "out_sym_refs:     %x\n"
+                   "num_native_refs:  %x\n"
                    "except_handlers:  %x\n"
                    "frame_size:       %x\n"
                    "length:           %x\n",
@@ -690,9 +724,11 @@ void test_block_macros( uint64_t ptr_as_int )
                    BLOCK_ANNOTS( b ),
                    BLOCK_AUX_LENGTH( b ),
                    BLOCK_OUT_SYM_REFS( b ),
+                   BLOCK_NATIVE_REFS( b ),
                    BLOCK_EXCEPT_HANDLERS( b ),
                    BLOCK_FRAME_SIZE( b ),
                    BLOCK_LENGTH( b ) );
+#endif
 }
 
 /*
@@ -750,22 +786,33 @@ static void *fetch_execute(void *v)
 
   /* FIXME */
   /* This currently only supports 10 args */
-  for( i = 1; i < argc && i < 11; i++ )
+  /* If work is NULL, this was started from the command line */
+  if( !work )
   {
-    ar1 = ((cmdArg*) CAST_INT (reg_bank+i));
-    len = strlen( ar1->s );
-    ar2 = calloc( 1, sizeof(cmdArg) + len + 1 );
-    if( !ar2 )
-      EXIT_WITH_ERROR("Error: malloc failed in doInitProc\n");
-    strcpy( ar2->s, ar1->s );
-    reg[i] = (uint64_t) CAST_INT ar2;
+    for( i = 1; i < argc && i < 11; i++ )
+    {
+      ar1 = ((cmdArg*) CAST_INT (reg_bank+i));
+      len = strlen( ar1->s );
+      ar2 = calloc( 1, sizeof(cmdArg) + len + 1 );
+      if( !ar2 )
+        EXIT_WITH_ERROR("Error: malloc failed in do_init_proc\n");
+      strcpy( ar2->s, ar1->s );
+      reg[i] = (uint64_t) CAST_INT ar2;
+    }
+  }
+  else
+  {
+    for( i = 1; i < argc && i < 11; i++ )
+    {
+      reg[i] = reg_bank[i];
+    }
   }
 
   /* the processor ID is passed in */
   /*int processorID = args->procNum;*/
   retStruct *r = calloc( 1, sizeof(retStruct) );
   if( !r )
-    EXIT_WITH_ERROR("Error: malloc failed in doInitProc\n");
+    EXIT_WITH_ERROR("Error: malloc failed in do_init_proc\n");
 
   /* fetch/execute cycle */
   while (1)
@@ -788,7 +835,7 @@ static void *fetch_execute(void *v)
     uint8_t c3 = pc[2];
     uint8_t c4 = pc[3];
 #if DEBUG_XPVM
-    uint32_t word = assembleInst( ((unsigned char*) CAST_INT CIB) + CIO );
+    uint32_t word = assemble_inst( ((unsigned char*) CAST_INT CIB) + CIO );
     fprintf( stderr, "\tword: %08x\n", word );
 #endif
 
@@ -809,7 +856,8 @@ static void *fetch_execute(void *v)
     {
       return  (void *) VM520_ILLEGAL_INSTRUCTION;
     }
-    int32_t ret = opcodesXPVM[opcode].formatFunc(1, reg, &stack,
+
+    int32_t ret = opcodes[opcode].formatFunc(1, reg, &stack,
                                                  c1, c2, c3, c4 );
 #if DEBUG_XPVM
     fprintf( stderr, "\tret: %d\n", ret );
@@ -819,7 +867,7 @@ static void *fetch_execute(void *v)
       /* Check if ret was called */
       if( RET_OPCODE == opcode )
       {
-        r->retVal = reg[stack->retReg];
+        r->ret_val = reg[stack->ret_reg];
         stack_frame *old_frame = stack;
         stack = stack->prev;
         if( old_frame->block )
@@ -849,9 +897,9 @@ int main( int argc, char **argv )
 {
   /* error for functions returning from XPVM */
   int error_num = 0;
-  int64_t ptr = 0;
+  uint64_t ptr = 0;
   retStruct *r = NULL;
-  uint64_t retVal = 0;
+  uint64_t ret_val = 0;
 
   if( argc != 2 )
     EXIT_WITH_ERROR("Usage: xpvm one_object_file.obj\n");
@@ -864,23 +912,25 @@ int main( int argc, char **argv )
   pthread_mutex_unlock( &malloc_xpvm_mu );
 
 
-  if (!loadObjectFileXPVM(argv[1], &error_num))
-    EXIT_WITH_ERROR("loadObjectFileXPVM fails with error %d\n", error_num );
+  if (!load_object_file(argv[1], &error_num))
+    EXIT_WITH_ERROR("load_object_file fails with error %d\n", error_num );
 
-  doInitProc( &ptr, 0, 0, NULL );
+  do_init_proc( &ptr, 0, 0, NULL );
 
   pthread_t *pt = (pthread_t*)(uint32_t)ptr;
 
-  doProcJoin( (uint64_t)(uint32_t)pt, &retVal );
+  do_proc_join( (uint64_t)(uint32_t)pt, &ret_val );
 
-  r = (retStruct*) (uint32_t) retVal;
+  r = (retStruct*) (uint32_t) ret_val;
 
-  fprintf( stderr, "r->retVal: %lld\n", (uint64_t)r->retVal );
+  /* For floats. */
+  fprintf( stderr, "r->ret_val: %1.8lf\n", *(double*)&r->ret_val );
+  /*fprintf( stderr, "r->ret_val: %lld\n", (uint64_t)r->ret_val );*/
   fprintf( stderr, "r->status: %d\n", (int)r->status );
 
   if( 0 == strcmp( argv[1], "ret_42_malloc.obj" ) )
   {
-    uint8_t *ret_b = (uint8_t*) CAST_INT r->retVal;
+    uint8_t *ret_b = (uint8_t*) CAST_INT r->ret_val;
     fprintf( stderr, "%s\n", (char*) ret_b );
   }
 

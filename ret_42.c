@@ -22,24 +22,24 @@ int main( int argc, char **argv )
   int errorNumber = 0;
   int64_t ptr = 0;
   retStruct *r = NULL;
-  uint64_t retVal = 0;
+  uint64_t ret_val = 0;
 
   /* load ret_42.obj, Note: this was written by hand in object code */
-  if (!loadObjectFileXPVM("ret_42_call.obj", &errorNumber))
+  if (!load_object_file("ret_42_call.obj", &errorNumber))
   {
-    fprintf(stderr, "loadObjectFileXPVM fails with error %d\n", errorNumber);
+    fprintf(stderr, "load_object_file fails with error %d\n", errorNumber);
     exit(-1);
   }
 
-  doInitProc( &ptr, 0, 0, NULL );
+  do_init_proc( &ptr, 0, 0, NULL );
 
   pthread_t *pt = (pthread_t*)(uint32_t)ptr;
 
-  doProcJoin( (uint64_t)(uint32_t)pt, &retVal );
+  do_proc_join( (uint64_t)(uint32_t)pt, &ret_val );
 
-  r = (retStruct*) (uint32_t) retVal;
+  r = (retStruct*) (uint32_t) ret_val;
 
-  fprintf( stderr, "r->retVal: %d\n", (int)r->retVal );
+  fprintf( stderr, "r->ret_val: %d\n", (int)r->ret_val );
   fprintf( stderr, "r->status: %d\n", (int)r->status );
 
   free( r );

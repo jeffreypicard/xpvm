@@ -14,3 +14,5 @@ xpvm
 *.o
 # library files
 *.so
+#temp files
+lol*

@@ -14,7 +14,7 @@
 
 /*************************** Macros ********************************/
 
-#define DEBUG_XPVM 1
+#define DEBUG_XPVM 0
 
 #define MAX_REGS      256
 #define HIDDEN_REGS   4
@@ -52,7 +52,7 @@
 // maximum number of processors
 #define VM520_MAX_PROCESSORS 16
 
-// error codes for loadObjectFile
+// error codes for load_object_file
 #define VM520_FILE_NOT_FOUND -1
 #define VM520_FILE_CONTAINS_OUTSYMBOLS -2
 #define VM520_FILE_IS_NOT_VALID -3
@@ -67,11 +67,12 @@
 
 /****************** Public Interface Functions **********************/
 
-int32_t loadObjectFileXPVM( char *filename, int32_t *errorNumber );
+int32_t load_object_file( char *filename, int32_t *errorNumber );
 
-int doInitProc( int64_t *retVal, uint64_t work, int argc, 
+int do_init_proc( uint64_t *proc_id, uint64_t work, int argc, 
                  uint64_t *reg_bank );
-int doProcJoin( uint64_t procID, uint64_t *retVal );
+int do_proc_join( uint64_t proc_id, uint64_t *ret_val );
+int do_join2( uint64_t proc_id, uint64_t *ret_val );
 
 /************************** Structs *********************************/
 
@@ -85,7 +86,7 @@ struct _stack_frame
   uint64_t      cio;
   uint64_t      cib;
   uint64_t      reg255;
-  uint64_t      retReg;
+  uint64_t      ret_reg;
   //unsigned char *locals;
   //block         *block;
   struct _stack_frame *prev;
@@ -168,7 +169,7 @@ struct _cmdArg
 struct _retStruct
 {
   int status;
-  int64_t retVal;
+  int64_t ret_val;
 } typedef retStruct;
 
 /*
@@ -214,8 +215,17 @@ int stb_16      OPCODE_FUNC
 int stb_17      OPCODE_FUNC
 int sti_21      OPCODE_FUNC
 int addl_32     OPCODE_FUNC
+int addl_33     OPCODE_FUNC
 int subl_34     OPCODE_FUNC
 int mull_36     OPCODE_FUNC
+int addd_43     OPCODE_FUNC
+int muld_45     OPCODE_FUNC
+int divd_46     OPCODE_FUNC
+int cvtld_48    OPCODE_FUNC
+int cmplt_68    OPCODE_FUNC
+int jmp_80      OPCODE_FUNC
+int btrue_82    OPCODE_FUNC
+int bfalse_83   OPCODE_FUNC
 int malloc_96   OPCODE_FUNC
 int ldfunc_112  OPCODE_FUNC
 int call_114    OPCODE_FUNC
