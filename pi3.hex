@@ -1,0 +1,22 @@
+ldimm rc0, 0        #0ec00000 
+ldimm rc1, 0        #0ec10000 
+ldimm rc2, 0        #0ec20000 
+ldimm rc3, 1        #0ec30001 
+ldimm rc4, 4        #0ec40004 
+ldimm rc5, 0        #0ec50000 sum
+cvtld rc0, rc0      #30c0c000 
+cvtld rc1, rc1      #30c1c100 
+cvtld rc2, rc2      #30c2c200 
+cvtld rc3, rc3      #30c3c300 
+cvtld rc4, rc4      #30c4c400 
+cvtld rc5, rc5      #30c5c500 
+.
+.
+.
+mulld rc0,r0d,r0d   #2dc00d0d rc0 = x * x
+addd  rc1,rc3,rc0   #2bc1c3c0 rc1 = 1.0 + ( x * x )
+divd  rc2,rc4,rc1   #2ec2c4c1 rc2 = 4.0 / (1.0 + ( x * x ))
+addd  rc5,rc5,rc2   #2bc5c5c5 sum += 4.0 / (1.0 + ( x * x ))
+.
+.
+.
