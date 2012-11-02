@@ -13,6 +13,8 @@
 
 #include "xpvm.h"
 
+int print_int_a( uint64_t*, int );
+
 /*
  * FIXME:
  * This needs to be converted from an assembly function into

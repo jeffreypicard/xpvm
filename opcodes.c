@@ -342,7 +342,7 @@ int addl_33( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 {
   reg[ri] = (long)reg[rj] + (long)const8;
 #if DEBUG_XPVM
-  fprintf( stderr, "reg[ri]: %d\n", reg[ri] );
+  fprintf( stderr, "reg[ri]: %d\n", (int)reg[ri] );
 #endif
   return 1;
 }

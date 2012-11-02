@@ -7,12 +7,12 @@
  * Based on Professor Hatcher's vm520.
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#define _GNU_SOURCE
 #include <pthread.h>
 #include <dlfcn.h>
 
@@ -24,7 +24,7 @@
 /* forward references */
 static int read_word(FILE *fp, uint32_t *outWord);
 static int read_block(FILE *fp, int block_num );
-static int verify_obj_format( FILE *, uint32_t, uint64_t *);
+static int verify_obj_format(char *file_name, uint64_t *obj_len);
 static void *fetch_execute(void *v);
 void test_block_macros( uint64_t ptr_as_int );
 
@@ -299,7 +299,7 @@ int load_c_lib( void )
 int32_t load_object_file( char *filename, int32_t *errorNumber )
 {
   FILE *fp;
-  //uint64_t objLength = 0;
+  //uint64_t obj_len = 0;
   const uint32_t MAGIC = 0x31303636;
   uint32_t magic = 0;
   int i = 0;
@@ -349,7 +349,7 @@ int32_t load_object_file( char *filename, int32_t *errorNumber )
    * FIXME: This doesn't work.
    */
   /*
-  if( !verify_obj_format( fp, block_cnt, &objLength ) )
+  if( !verify_obj_format( fp, block_cnt, &obj_len ) )
   {
     *errorNumber = -3;
     return 0;
@@ -385,32 +385,62 @@ int32_t load_object_file( char *filename, int32_t *errorNumber )
  * Used for the XPVM.
  * FIXME FIXME FIXME: This is broken!
  */
-static int verify_obj_format(FILE *fp,uint32_t block_cnt,uint64_t *objLength)
+static int verify_obj_format(char *file_name, uint64_t *obj_len)
 {
-  fpos_t *fp_pos = NULL;
-  uint32_t cur_length = 0;
+  FILE *fp = NULL;
+  uint32_t cur_length = 0, magic = 0;
+  const uint32_t MAGIC = 0x31303636;
   int i = 0;
+  char *c = 0;
 
-  if(!( fp_pos = malloc(sizeof(fpos_t))))
-  {
-    fprintf( stderr, "Error: malloc failed in getObjLength\n");
-    exit(-1);
-  }
-
-  /* Save the current position in the file. */
 #if DEBUG_XPVM
-  fprintf( stderr, "In getObjLength\n");
+  fprintf( stderr, "In verify_obj_format\n");
 #endif
+
+  /*fp_pos = calloc( 1, sizeof(fpos_t) );*/
+  fp = fopen( file_name, "r" );
+  MALLOC_CHECK( fp, "Error: fopen failed in verify_obj_format\n");
+
+  /* read headers */
+  if( !read_word( fp, (uint32_t*) &magic ) )
+    return -3;
+#if DEBUG_XPVM
+  fprintf( stderr, "magic: %x\n", magic );
+#endif
+  if( MAGIC != magic )
+    return -3;
+  if( !read_word( fp, (uint32_t *) &block_cnt ) )
+    return -3;
+
+#if DEBUG_XPVM
+  fprintf( stderr, "block_cnt: %d\n", block_cnt );
+#endif
+
+  /* Save the current position in the file. 
   if( 0 > fgetpos( fp, fp_pos ) )
-    return 0;
+    return 0;*/
 
 #if DEBUG_XPVM
   fprintf( stderr, "After intial read\n");
 #endif
 
-  *objLength = 0;
+  *obj_len = 0;
   for( i = 0; i < block_cnt; i++ )
   {
+    /* skip name */
+    fread( &c, 1, 1, fp );
+    while( c ) fread( &c, 1, 1, fp );
+
+    /* Skip annotations */
+    if( !read_word( fp, &cur_length ) )
+      return 0;
+    if( !read_word( fp, &cur_length ) )
+      return 0;
+    /* skip frame size */
+    if( !read_word( fp, &cur_length ) )
+      return 0;
+
+    /* Get the current block size */
     if( !read_word( fp, &cur_length ) )
       return 0;
 #if DEBUG_XPVM
@@ -418,24 +448,25 @@ static int verify_obj_format(FILE *fp,uint32_t block_cnt,uint64_t *objLength)
 #endif
     if( 0 > fseek( fp, cur_length-1, SEEK_CUR ) )
       return 0;
-    *objLength += cur_length;
+    *obj_len += cur_length;
   }
 
 #if DEBUG_XPVM
-  fprintf( stderr, "After objLength calculation\n");
+  fprintf( stderr, "After obj_len calculation\n");
 #endif
 
-  /* Return the file reading to its original position */
+  /* Return the file reading to its original position 
   if( 0 > fsetpos( fp, fp_pos ) )
     return 0;
 
-  free( fp_pos );
+  free( fp_pos );*/
 
 #if DEBUG_XPVM
   fprintf( stderr, "Leaving getObjLength\n");
 #endif
 
-  return 1;
+  fclose(fp);
+  return 0;
 }
 
 /*
@@ -666,12 +697,13 @@ int do_join2( uint64_t proc_id, uint64_t *ret_val )
 
 /*
  * read_word
+ * op
  *
  * Reads a word (32 bits) from the object file and
  * returns it through the second parameter.
  * returns 0 on EOF.
  */
-static int read_word(FILE *fp, uint32_t *outWord)
+static int read_word(FILE *fp, uint32_t *out_word)
 {
   int c1 = getc(fp);
   int c2 = getc(fp);
@@ -682,13 +714,9 @@ static int read_word(FILE *fp, uint32_t *outWord)
   {
     return 0;
   }
-  *outWord = ((c1 << 24) | (c2 << 16) | (c3 << 8) | c4);
+  *out_word = ((c1 << 24) | (c2 << 16) | (c3 << 8) | c4);
   return 1;
 }
-
-#define PC reg[15]
-#define SP reg[14]
-#define FP reg[13]
 
 uint32_t assemble_inst( uint8_t *pc )
 {
@@ -898,6 +926,7 @@ int main( int argc, char **argv )
   /* error for functions returning from XPVM */
   int error_num = 0;
   uint64_t ptr = 0;
+  uint64_t obj_len = 0;
   retStruct *r = NULL;
   uint64_t ret_val = 0;
 
@@ -906,11 +935,14 @@ int main( int argc, char **argv )
 
   pthread_mutex_init( &malloc_xpvm_mu, NULL );
 
+  /* Initialize the allocator and the dynamic libraries */
   pthread_mutex_lock( &malloc_xpvm_mu );
   malloc_xpvm_init( 10000 );
   load_c_lib();
   pthread_mutex_unlock( &malloc_xpvm_mu );
 
+  if( verify_obj_format( argv[1], &obj_len ) != 0 )
+    EXIT_WITH_ERROR("Error: Invalid of corrupt object file.\n");
 
   if (!load_object_file(argv[1], &error_num))
     EXIT_WITH_ERROR("load_object_file fails with error %d\n", error_num );

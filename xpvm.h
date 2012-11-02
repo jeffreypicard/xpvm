@@ -6,15 +6,15 @@
  * Author: Jeffrey Picard
  */
 
-#ifndef __VM520_H
-#define __VM520_H
+#ifndef __XPVM_H
+#define __XPVM_H
 
 #include <stdint.h>
 #include <pthread.h>
 
 /*************************** Macros ********************************/
 
-#define DEBUG_XPVM 0
+#define DEBUG_XPVM 1
 
 #define MAX_REGS      256
 #define HIDDEN_REGS   4
@@ -39,10 +39,15 @@
 
 #define TWO_8_TO_16( b1, b2 ) ((uint16_t)b1 << 8) | b2
 
-#define EXIT_WITH_ERROR(...){     \
+#define EXIT_WITH_ERROR(...)do {  \
   fprintf( stderr, __VA_ARGS__ ); \
   exit( -1 );                     \
-}                                 \
+}while(0)                         \
+
+#define MALLOC_CHECK( p, ... ) do {  \
+  if( !p )                           \
+    EXIT_WITH_ERROR( __VA_ARGS__ );  \
+} while(0)
 
 /* Definition for block types */
 //#define FUNCTION_BLOCK 1

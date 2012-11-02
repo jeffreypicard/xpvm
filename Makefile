@@ -7,9 +7,6 @@ CFLAGS = -g -Wall -pthread
 
 all: xpvm
 
-ret_42: xpvm.o ret_42.o ret_42.obj
-	$(CC) $(CFLAGS) opcodes.o xpvm.o ret_42.o -o ret_42
-
 xpvm: xpvm.o opcodes.o allocator.o wrapped_c_lib.so print_int.o
 	$(CC) $(CFLAGS) -rdynamic xpvm.o opcodes.o allocator.o print_int.o -o xpvm -ldl
 
@@ -28,9 +25,6 @@ wrapped_c_lib.so: wrapped_c_lib.o
 wrapped_c_lib.o: wrapped_c_lib.c
 	$(CC) $(CFLAGS) -c wrapped_c_lib.c
 
-ret_42.o: ret_42.c xpvm.h
-	$(CC) $(CFLAGS) -c ret_42.c
-
 # Assembly functions
 print_int.o:	print_int.s
 	$(CC) $(CFLAGS) -c $^
@@ -38,7 +32,7 @@ print_int.o:	print_int.s
 .PHONY: clean test
 
 clean:
-	-rm -f xpvm.o opcodes.o allocator.o wrapped_c_lib.o wrapped_c_lib.so
+	-rm -f xpvm xpvm.o opcodes.o allocator.o wrapped_c_lib.o wrapped_c_lib.so
 
 test:
 	./xpvm ret_42.obj
