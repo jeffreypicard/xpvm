@@ -1,0 +1,51 @@
+3130 3636             # magic number
+0000 0001             # unsigned block count
+6d61 696e             # function name, main
+00 
+0000 0000             # annotations, executable 
+0000 0002 
+0000 0000             # frame size
+0000 007c             # contents length
+0e0a 00ff             # ldimm   0a <-- 255 
+0e0b 0001             # ldimm   0b <-- 1
+0e0c 0000             # ldimm   0c <-- 0
+0e0d 0000             # ldimm   0d <-- 0
+300d 0d00             # cvtld   0d <-- 0d 
+30b1 0a00             # cvtld   b1 <-- 0a 
+30b2 0b00             # cvtld   b2 <-- 0b 
+2eba 0b0a             # divd    ba <-- 0b / 0a 
+0ec0 0000             # ldimm   c0 <-- 0
+0ec1 0000             # ldimm   c1 <-- 0
+0ec2 0000             # ldimm   c2 <-- 0
+0ec3 0001             # ldimm   c3 <-- 1
+0ec4 0004             # ldimm   c4 <-- 4
+0ec5 0000             # ldimm   c4 <-- 0
+30c0 c000             # cvtld   c0 <-- c0 
+30c1 c100             # cvtld   c1 <-- c1 
+30c2 c200             # cvtld   c2 <-- c2 
+30c3 c300             # cvtld   c3 <-- c3 
+30c4 c400             # cvtld   c4 <-- c4 
+30c5 c500             # cvtld   c5 <-- c5 
+44aa 0c0a             # cmplt   aa <-- 0c < 0a 
+53aa 0008             # bfalse  aa == 0 ==> CIO <-- CIO + 08*4
+2dc0 0d0d             # addd    c0 <-- 0d * 0d 
+2bc1 c3c0             # addd    c1 <-- c3 + c0 
+2ec2 c4c1             # divd    c2 <-- c4 / c1 
+2dc2 c2ba             # muld    c2 <-- c2 * ba 
+2bc5 c5c2             # addd    c5 <-- c5 + c2 
+2b0d 0dba             # addd    0d <-- 0d + ba 
+210c 0c01             # addl    0c <-- 0c + 1
+5000 fff6             # jmp     CIO <-- CIO + (-9*4) 
+74ff c5ff             # ret     c5 
+0000 0000             # unsigned number of exception handlers
+0000 0000             # unsigned outsymbol references
+0000 0000             # unsigned native function references
+0000 0000             # auxiliary data length
+
+#0000 0000             
+#0000 0000 
+#0000 0000 
+#0000 0000 
+#0a01 2345 
+#6789 abcd 
+#ef0a 

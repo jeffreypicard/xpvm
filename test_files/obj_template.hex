@@ -1,0 +1,13 @@
+3130 3636             # magic number
+0000 0001             # unsigned block count
+6d61 696e             # Null terminated utf string block name, "main"
+00 
+0000 0000             # annotations
+0000 0002             # 2 is executable 
+0000 0000             # unsigned frame size
+0000 0000             # unsigned contents length (won't be zero)
+0000 0000             # unsigned number of exception handlers
+0000 0000             # unsigned outsymbol references
+0000 0000             # unsigned native function references
+0000 0000             # auxiliary data length
+
