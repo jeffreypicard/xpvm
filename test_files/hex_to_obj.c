@@ -3,6 +3,8 @@
  *
  * Takes a program written in 'hex' for the xpvm
  * and outputs the object file for it.
+ *
+ * Author: Jeffrey Picard
  */
 #include <stdlib.h>
 #include <stdio.h>

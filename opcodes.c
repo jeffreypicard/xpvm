@@ -914,21 +914,29 @@ int retrieve_129( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 int initProc_144( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
-  do_init_proc( &reg[ri], reg[rj], const8, reg );
+  int i = 0;
+  uint64_t *args = calloc( const8+1, sizeof(uint64_t) );
+  if( !args )
+    EXIT_WITH_ERROR("Error: malloc failed in initProc_144\n");
+
+  for( i = 0; i <= const8; i++  )
+    args[i] = reg[i];
+
+  do_init_proc( &reg[ri], reg[rj], const8, args );
   return 1;
 }
 
 int join_145( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t c4 )
 {
-  do_proc_join( reg[rj], &reg[ri] );
+  do_proc_join( reg[ri], &reg[rj] );
   return 1;
 }
 
 int join2_146( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t c4 )
 {
-  do_join2( reg[rj], &reg[ri] );
+  do_join2( reg[ri], &reg[rj] );
   return 1;
 }
 

@@ -85,7 +85,7 @@ opcodes[] =
 {"stf",       2, NULL}, /* 25 */
 {"std",       1, NULL}, /* 26 */
 {"std",       2, NULL}, /* 27 */
-{"28",        0, NULL},        /* 28 */
+{"ldblkid",   0, ldblkid_28},        /* 28 */
 {"29",        0, NULL},        /* 29 */
 {"30",        0, NULL},        /* 30 */
 {"31",        0, NULL},        /* 31 */
@@ -201,8 +201,8 @@ opcodes[] =
 {"141",       0, NULL},        /* 141 */
 {"142",       0, NULL},        /* 142 */
 {"143",       0, NULL},        /* 143 */
-{"initProc",  2, NULL}, /* 144 */
-{"join",      1, NULL}, /* 145 */
+{"initProc",  2, initProc_144}, /* 144 */
+{"join",      1, join_145}, /* 145 */
 {"join2",     1, NULL}, /* 146 */
 {"whoami",    1, NULL}, /* 147 */
 };
@@ -670,7 +670,8 @@ int do_proc_join( uint64_t proc_id, uint64_t *ret_val )
     perror("error in thread join");
     exit(-1);
   }
-  *ret_val = (uint64_t) CAST_INT ret;
+  /**ret_val = (uint64_t) CAST_INT ret;*/
+  *ret_val =  ((ret_struct*)ret)->ret_val;
   free( pt );
 
   return 0;
@@ -817,7 +818,10 @@ static void *fetch_execute(void *v)
   /* If work is NULL, this was started from the command line */
   if( !work )
   {
-    for( i = 1; i < argc && i < 11; i++ )
+#if DEBUG_XPVM
+    fprintf( stderr, "Started from command line\n" );
+#endif
+    for( i = 1; i <= argc && i < 11; i++ )
     {
       ar1 = ((cmdArg*) CAST_INT (reg_bank+i));
       len = strlen( ar1->s );
@@ -830,15 +834,22 @@ static void *fetch_execute(void *v)
   }
   else
   {
-    for( i = 1; i < argc && i < 11; i++ )
+#if DEBUG_XPVM
+    fprintf( stderr, "copying over %d args\n", argc );
+#endif
+    for( i = 1; i <= argc && i < 11; i++ )
     {
+#if DEBUG_XPVM
+      fprintf( stderr, "arg %d: %lld\n", i, reg_bank[i] );
+#endif
       reg[i] = reg_bank[i];
     }
+    free( reg_bank );
   }
 
   /* the processor ID is passed in */
   /*int processorID = args->procNum;*/
-  retStruct *r = calloc( 1, sizeof(retStruct) );
+  ret_struct *r = calloc( 1, sizeof(ret_struct) );
   if( !r )
     EXIT_WITH_ERROR("Error: malloc failed in do_init_proc\n");
 
@@ -927,7 +938,7 @@ int main( int argc, char **argv )
   int error_num = 0;
   uint64_t ptr = 0;
   uint64_t obj_len = 0;
-  retStruct *r = NULL;
+  ret_struct *r = NULL;
   uint64_t ret_val = 0;
 
   if( argc != 2 )
@@ -953,12 +964,12 @@ int main( int argc, char **argv )
 
   do_proc_join( (uint64_t)(uint32_t)pt, &ret_val );
 
-  r = (retStruct*) (uint32_t) ret_val;
+  /*r = (ret_struct*) (uint32_t) ret_val;*/
 
   /* For floats. */
-  fprintf( stderr, "r->ret_val: %1.8lf\n", *(double*)&r->ret_val );
+  fprintf( stderr, "r->ret_val: %1.8lf\n", *(double*)&ret_val );
   /*fprintf( stderr, "r->ret_val: %lld\n", (uint64_t)r->ret_val );*/
-  fprintf( stderr, "r->status: %d\n", (int)r->status );
+  /*fprintf( stderr, "r->status: %d\n", (int)r->status );*/
 
   if( 0 == strcmp( argv[1], "ret_42_malloc.obj" ) )
   {
@@ -966,7 +977,8 @@ int main( int argc, char **argv )
     fprintf( stderr, "%s\n", (char*) ret_b );
   }
 
-  free( r );
+  /* FIXME: Double free when running with multiple processors */
+  /*free( r );*/
 
   return 0;
 }

@@ -14,7 +14,7 @@
 
 /*************************** Macros ********************************/
 
-#define DEBUG_XPVM 1
+#define DEBUG_XPVM 0
 
 #define MAX_REGS      256
 #define HIDDEN_REGS   4
@@ -171,11 +171,11 @@ struct _cmdArg
  * Struct for passing back the exit status and return value
  * of a processor (thread)i from doJoin.
  */
-struct _retStruct
+struct _ret_struct
 {
   int status;
   int64_t ret_val;
-} typedef retStruct;
+} typedef ret_struct;
 
 /*
  * Struct for the arguments to the fetch_execute function
@@ -219,6 +219,7 @@ int ldimm2_15   OPCODE_FUNC
 int stb_16      OPCODE_FUNC
 int stb_17      OPCODE_FUNC
 int sti_21      OPCODE_FUNC
+int ldblkid_28  OPCODE_FUNC
 int addl_32     OPCODE_FUNC
 int addl_33     OPCODE_FUNC
 int subl_34     OPCODE_FUNC
@@ -236,6 +237,8 @@ int ldfunc_112  OPCODE_FUNC
 int call_114    OPCODE_FUNC
 int calln_115   OPCODE_FUNC
 int ret_116     OPCODE_FUNC
+int initProc_144  OPCODE_FUNC
+int join_145    OPCODE_FUNC
 
 /*************************** Native functions ****************************/
 

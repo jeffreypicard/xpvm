@@ -35,10 +35,10 @@ clean:
 	-rm -f xpvm xpvm.o opcodes.o allocator.o wrapped_c_lib.o wrapped_c_lib.so
 
 test:
-	./xpvm ret_42.obj
-	./xpvm ret_42_2.obj
-	./xpvm ret_42_subl_34.obj
-	./xpvm ret_42_call.obj
-	./xpvm ret_42_local.obj
-	./xpvm ret_42_call_local.obj
-	./xpvm ret_42_malloc.obj
+	./xpvm test_files/ret_42.obj
+	./xpvm test_files/ret_42_2.obj
+	./xpvm test_files/ret_42_subl_34.obj
+	./xpvm test_files/ret_42_call.obj
+	./xpvm test_files/ret_42_local.obj
+	./xpvm test_files/ret_42_call_local.obj
+	./xpvm test_files/ret_42_malloc.obj

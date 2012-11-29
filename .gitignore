@@ -6,6 +6,7 @@ sumVector
 inst_disassemble
 ret_42
 xpvm
+test_files/hex_to_obj
 
 # vim temp files
 *.swp
