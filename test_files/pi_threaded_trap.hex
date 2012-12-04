@@ -30,7 +30,7 @@
 0000 0000             # annotations, executable 
 0000 0002 
 0000 0000             # frame size
-0000 0080             # contents length
+0000 007c             # contents length
 ### Get arguments passed in and convert to doubles
 300a 0100             # cvtld   0a <-- 01       (Start point) 
 300c 0200             # cvtld   0c <-- 02       (End point)
@@ -38,7 +38,7 @@
 ### Initialize some variables and conver to  doubles
 0e0b 0001             # ldimm   0b <-- 1
 0e0d 0000             # ldimm   0d <-- 0
-300d 0d00             # cvtld   0d <-- 0d 
+300d 0100             # cvtld   0d <-- 01 
 30b1 0b00             # cvtld   b1 <-- 0b 
 ### Calculate dx and initial x
 2eba b1b2             # divd    ba <-- b1 / b2  (dx)

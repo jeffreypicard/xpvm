@@ -939,7 +939,8 @@ int main( int argc, char **argv )
   uint64_t ptr = 0;
   uint64_t obj_len = 0;
   ret_struct *r = NULL;
-  uint64_t ret_val = 0;
+  /*uint64_t ret_val = 0;*/
+  void *ret = NULL;
 
   if( argc != 2 )
     EXIT_WITH_ERROR("Usage: xpvm one_object_file.obj\n");
@@ -962,12 +963,20 @@ int main( int argc, char **argv )
 
   pthread_t *pt = (pthread_t*)(uint32_t)ptr;
 
-  do_proc_join( (uint64_t)(uint32_t)pt, &ret_val );
+  /*do_proc_join( (uint64_t)(uint32_t)pt, &ret_val );*/
+  /* Since this is the main process we need to whole return struct
+   * not just the 64 bit thing that it returned as its return value */
+  if (pthread_join(*pt, &ret) != 0)
+  {
+    perror("error in thread join");
+    exit(-1);
+  }
 
-  /*r = (ret_struct*) (uint32_t) ret_val;*/
+  r =  (ret_struct*)ret;
+  /*r = (ret_struct*) (uint32_t) ret;*/
 
   /* For floats. */
-  fprintf( stderr, "r->ret_val: %1.8lf\n", *(double*)&ret_val );
+  fprintf( stderr, "r->ret_val: %1.8lf\n", *(double*)&(r->ret_val) );
   /*fprintf( stderr, "r->ret_val: %lld\n", (uint64_t)r->ret_val );*/
   /*fprintf( stderr, "r->status: %d\n", (int)r->status );*/
 
