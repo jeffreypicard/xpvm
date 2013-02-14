@@ -37,6 +37,19 @@
 
 #define CAST_INT (uint32_t)
 
+/* FIXME: This relies on the index varialbe i already being defined
+ * This read a 32 bit integer from the object file INTO a little endian
+ * 32 bit integer */
+#define READ_INT32_LITTLE_ENDIAN( var, fp ) do {      \
+  for( i = 0; i < 4; i++ )                            \
+    var |= ( CAST_INT fgetc(fp) << (32 - (i+1)*8) );  \
+} while(0)
+
+#define READ_INT64_LITTLE_ENDIAN( var, fp ) do {      \
+  for( i = 0; i < 8; i++ )                            \
+    var |= ( CAST_INT fgetc(fp) << (64 - (i+1)*8) );  \
+} while(0)
+
 #define TWO_8_TO_16( b1, b2 ) ((uint16_t)b1 << 8) | b2
 
 #define EXIT_WITH_ERROR(...)do {  \

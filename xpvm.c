@@ -343,18 +343,6 @@ int32_t load_object_file( char *filename, int32_t *errorNumber )
   fprintf(stderr, "block_cnt: %d\n", block_cnt );
 #endif
 
-  /* 
-   * Get the length of the object file 
-   * and do a sanity check on the format 
-   * FIXME: This doesn't work.
-   */
-  /*
-  if( !verify_obj_format( fp, block_cnt, &obj_len ) )
-  {
-    *errorNumber = -3;
-    return 0;
-  }*/
-
   /* Read the blocks into memory */
   for( i = 0; i < block_cnt; i++ )
   {
@@ -371,19 +359,13 @@ int32_t load_object_file( char *filename, int32_t *errorNumber )
 }
 
 /*
- * FIXME FIXME FIXME: This is broken!
  * verify_obj_format
  *
  * Gets the length of the object file in bytes.
  * Takes a file pointer, a 32 bit block count and a
  * pointer to a 64 bit int for returning the length in
  * bytes.
- * Returns 1 on success, 0 if the object file is malformed
- * (The number of blocks is not what was indicated in the file header).
- * FIXME: Should this function also check to make sure there are no
- * out symbol references?
- * Used for the XPVM.
- * FIXME FIXME FIXME: This is broken!
+ * Returns 0 on success, nonzero otherwise.
  */
 static int verify_obj_format(char *file_name, uint64_t *obj_len)
 {
@@ -510,24 +492,27 @@ static int read_block( FILE *fp, int block_num )
 #endif
 
   /* Read trait annotations */
-  for( i = 0; i < 8; i++ )
-    annots |=  ( (uint64_t)fgetc( fp ) << (64 - (i+1)*8) );
+  /*for( i = 0; i < 8; i++ )
+    annots |=  ( (uint64_t)fgetc( fp ) << (64 - (i+1)*8) );*/
+  READ_INT64_LITTLE_ENDIAN( annots, fp );
 
 #if DEBUG_XPVM
   fprintf( stderr, "annots: %016llx\n", annots );
 #endif
 
   /* Read frame size */
-  for( i = 0; i < 4; i++ )
-    frame_size |=  ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  /*for( i = 0; i < 4; i++ )
+    frame_size |=  ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
+  READ_INT32_LITTLE_ENDIAN( frame_size, fp );
 
 #if DEBUG_XPVM
   fprintf( stderr, "frame_size: %08x\n", frame_size );
 #endif
 
   /* Read contents length */
-  for( i = 0; i < 4; i++ )
-    length |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  /*for( i = 0; i < 4; i++ )
+    length |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
+  READ_INT32_LITTLE_ENDIAN( length, fp );
 
 #if DEBUG_XPVM
   fprintf( stderr, "length: %08x\n", length );
@@ -553,29 +538,36 @@ static int read_block( FILE *fp, int block_num )
   }
 
   /* Read number of exception handlers */
-  for( i = 0; i < 4; i++ )
-    num_except_handlers |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  /*for( i = 0; i < 4; i++ )
+    num_except_handlers |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
+  READ_INT32_LITTLE_ENDIAN( num_except_handlers, fp );
 
 #if DEBUG_XPVM
   fprintf( stderr, "num_except_handlers: %08x\n", num_except_handlers );
 #endif
 
   /* Read number of outsymbol references */
-  for( i = 0; i < 4; i++ )
-    num_outsymbol_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  /*for( i = 0; i < 4; i++ )
+    num_outsymbol_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
+  READ_INT32_LITTLE_ENDIAN( num_outsymbol_refs, fp );
+
+#if DEBUG_XPVM
+  fprintf( stderr, "num_outsymbol_refs: %08x\n", num_outsymbol_refs );
+#endif
 
   /* Read number of native function references */
- 
-  for( i = 0; i < 4; i++ )
-    num_native_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  /*for( i = 0; i < 4; i++ )
+    num_native_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
+  READ_INT32_LITTLE_ENDIAN( num_native_refs, fp );
 
 #if DEBUG_XPVM
   fprintf( stderr, "num_outsymbol_refs: %08x\n", num_outsymbol_refs );
 #endif
 
   /* Read length of auxiliary data */
-  for( i = 0; i < 4; i++ )
-    length_aux_data |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );
+  /*for( i = 0; i < 4; i++ )
+    length_aux_data |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
+  READ_INT32_LITTLE_ENDIAN( length_aux_data, fp );
 
 #if DEBUG_XPVM
   fprintf( stderr, "length_aux_data: %08x\n", length_aux_data );
