@@ -27,11 +27,12 @@ int print_int( unsigned int proc_id, uint64_t *reg, stack_frame **stak,
 {
   /*if( 0 >= fprintf( stderr, "%d\n", const8 ) )
     return 0;*/
-  char *s = "The answer is %d\n";
-  reg[1] = const8;
-  reg[2] = (uint64_t) CAST_INT s;
+  //char *s = "The answer is %d\n";
+  //reg[1] = const8;
+  //reg[2] = (uint64_t) CAST_INT s;
   /*fprintf( stderr, "reg: %p\n", reg );*/
-  print_int_a( reg, 2 );
+  //print_int_a( reg, 2 );
+  printf("%d\n", const8 );
   return 1;
 }
 

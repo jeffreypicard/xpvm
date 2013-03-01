@@ -7,8 +7,8 @@ CFLAGS = -g -Wall -pthread
 
 all: xpvm
 
-xpvm: xpvm.o opcodes.o allocator.o wrapped_c_lib.so print_int.o
-	$(CC) $(CFLAGS) -rdynamic xpvm.o opcodes.o allocator.o print_int.o -o xpvm -ldl
+xpvm: xpvm.o opcodes.o allocator.o wrapped_c_lib.so
+	$(CC) $(CFLAGS) -rdynamic xpvm.o opcodes.o allocator.o -o xpvm -ldl
 
 xpvm.o: xpvm.c xpvm.h opcodes.o
 	$(CC) $(CFLAGS) -c xpvm.c
@@ -20,14 +20,14 @@ allocator.o: allocator.c xpvm.h
 	$(CC) $(CFLAGS) -c allocator.c
 
 wrapped_c_lib.so: wrapped_c_lib.o
-	$(CC) -shared -o wrapped_c_lib.so wrapped_c_lib.o
+	$(CC) -fPIC -shared -o wrapped_c_lib.so wrapped_c_lib.o
 
 wrapped_c_lib.o: wrapped_c_lib.c
-	$(CC) $(CFLAGS) -c wrapped_c_lib.c
+	$(CC) $(CFLAGS) -fPIC -shared -c wrapped_c_lib.c
 
 # Assembly functions
-print_int.o:	print_int.s
-	$(CC) $(CFLAGS) -c $^
+#print_int.o:	print_int.s
+#	$(CC) $(CFLAGS) -c $^
 
 .PHONY: clean test
 

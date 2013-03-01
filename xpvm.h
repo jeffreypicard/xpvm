@@ -35,7 +35,7 @@
 
 #define RET_OPCODE 0x74
 
-#define CAST_INT (uint32_t)
+#define CAST_INT (uint64_t)
 
 /* FIXME: This relies on the index varialbe i already being defined
  * This read a 32 bit integer from the object file INTO a little endian

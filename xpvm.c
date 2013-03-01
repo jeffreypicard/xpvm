@@ -908,7 +908,7 @@ static void *fetch_execute(void *v)
       }
       r->status = ret;
       pthread_exit( (void*) CAST_INT r );
-      return (void *) ret;
+      return (void *) CAST_INT ret;
     }
     else if (ret != 1)
       EXIT_WITH_ERROR("Error: Unexpected return value from formatFunc"
@@ -953,7 +953,7 @@ int main( int argc, char **argv )
 
   do_init_proc( &ptr, 0, 0, NULL );
 
-  pthread_t *pt = (pthread_t*)(uint32_t)ptr;
+  pthread_t *pt = (pthread_t*) CAST_INT ptr;
 
   /*do_proc_join( (uint64_t)(uint32_t)pt, &ret_val );*/
   /* Since this is the main process we need to whole return struct
