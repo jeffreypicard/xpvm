@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <ctype.h>
 
 #define EXIT_WITH_ERROR( ... ) do { \
   fprintf( stderr, __VA_ARGS__ );   \
