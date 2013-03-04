@@ -1,0 +1,28 @@
+#
+# addd_test.hex
+#
+# Hex code for an XPVM program to test the addd instruction.
+# Returns 42.
+#
+# Author: Jeffrey Picard 
+#
+3130 3636                   # Magic number
+0000 0001                   # Unsigned block count
+
+6d61 696e                   # Function name "main"
+00 
+0000 0000                   # Annotations, executable
+0000 0002 
+0000 0000                   # Frame size
+0000 0018                   # Contents length
+0e01 0029                   # Opcode 
+0e02 0001                   # Opcode  
+3003 0100                   # Opcode 
+3004 0200                   # Opcode 
+2b05 0304                   # Opcode 
+74ff 05ff                   # ret     05 
+0000 0000                   # unsigned number of exception handlers
+0000 0000                   # unsigned outsymbol references
+0000 0000                   # unsigned native function references
+0000 0000                   # auxiliary data length
+0a                          # auxiliary data 
