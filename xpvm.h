@@ -85,7 +85,11 @@
 
 /****************** Public Interface Functions **********************/
 
-int32_t load_object_file( char *filename, int32_t *errorNumber );
+/* obj_file.c */
+int32_t load_object_file( char *filename, int32_t *errorNumber, uint32_t*, uint64_t** );
+int read_block( FILE *fp, int block_num, uint64_t* );
+int read_word(FILE *fp, uint32_t *out_word);
+int verify_obj_format(char *file_name, uint64_t *obj_len);
 
 int do_init_proc( uint64_t *proc_id, uint64_t work, int argc, 
                  uint64_t *reg_bank );
