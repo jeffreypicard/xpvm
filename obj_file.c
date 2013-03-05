@@ -113,7 +113,7 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
   uint8_t  *b_data              = 0;
   uint8_t  temp                 = 0;
 
-  int i = 0;
+  int i = 0, j = 0;
   /* Read name string from block */
   while( (name[i] = fgetc( fp )) && ++i < MAX_NAME_LEN );
   /* Name too long */
@@ -171,11 +171,18 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
   fprintf( stderr, "num_except_handlers: %08x\n", num_except_handlers );
 #endif
 
+  uint8_t *except_data = calloc( 4 + 12*num_except_handlers, sizeof(uint8_t));
+  *((uint32_t*)except_data) = num_except_handlers;
+
+  j = 4;
   for( i = 0; i < num_except_handlers; i++ )
   {
-    READ_INT32_LITTLE_ENDIAN( temp, fp );
-    READ_INT32_LITTLE_ENDIAN( temp, fp );
-    READ_INT32_LITTLE_ENDIAN( temp, fp );
+    READ_INT32_LITTLE_ENDIAN( *((uint32_t*)(except_data+j)), fp );
+    j += 4;
+    READ_INT32_LITTLE_ENDIAN( *((uint32_t*)(except_data+j)), fp );
+    j += 4;
+    READ_INT32_LITTLE_ENDIAN( *((uint32_t*)(except_data+j)), fp );
+    j += 4;
   }
 
   /* Read number of outsymbol references */
@@ -240,7 +247,7 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
   BLOCK_ANNOTS( b_data_read )           = annots;
   BLOCK_AUX_LENGTH( b_data_read )       = length_aux_data;
   BLOCK_OUT_SYM_REFS( b_data_read )     = num_outsymbol_refs;
-  BLOCK_EXCEPT_HANDLERS( b_data_read )  = num_except_handlers;
+  BLOCK_EXCEPT_HANDLERS( b_data_read )  = CAST_INT except_data;
   BLOCK_NATIVE_REFS( b_data_read )      = num_native_refs;
   BLOCK_FRAME_SIZE( b_data_read )       = frame_size;
   BLOCK_LENGTH( b_data_read )           = length;

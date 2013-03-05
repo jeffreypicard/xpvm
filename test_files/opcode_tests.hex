@@ -1,7 +1,7 @@
 #
-# addd_test.hex
+# opcode_tests.hex
 #
-# Hex code for an XPVM program to test the addd instruction.
+# Hex code for an XPVM program to test the opcodes.
 # Returns 42.
 #
 # Author: Jeffrey Picard 
@@ -14,12 +14,28 @@
 0000 0000                   # Annotations, executable
 0000 0002 
 0000 0000                   # Frame size
-0000 0018                   # Contents length
+0000 0048                   # Contents length
 0e01 0029                   # ldimm   r01 <-- $0029 
 0e02 0001                   # ldimm   r02 <-- $0001  
+0ea0 0000                   # ldimm   ra0 <-- $0000 
+0ea1 0003                   # ldimm   ra1 <-- $0003 
+#
+2001 01a0                   # addl    r01 <-- r01 + ra0 
+2101 0100                   # addl    r01 <-- r01 + $00 
+2201 01a0                   # subl    r01 <-- r01 - ra0 
+2301 0100                   # subl    r01 <-- r01 - $00 
+2401 0102                   # mull    r01 <-- r01 * r02 
+2501 0101                   # mull    r01 <-- r01 * $01 
+2601 0102                   # divl    r01 <-- r01 / r02 
+2701 0101                   # divl    r01 <-- r01 / $01 
+2801 a102                   # reml    r01 <-- ra1 % r02 
+2901 a101                   # reml    r01 <-- ra1 % $01 
+#
 3003 0100                   # cvtld   r03 <-- r01 
 3004 0200                   # cvtld   r04 <-- r02 
+#
 2b05 0304                   # addd    r05 <-- r03 + r04 
+#
 74ff 05ff                   # ret     r05 
 0000 0000                   # unsigned number of exception handlers
 0000 0000                   # unsigned outsymbol references

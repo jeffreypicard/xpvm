@@ -241,7 +241,13 @@ int ldblkid_28  OPCODE_FUNC
 int addl_32     OPCODE_FUNC
 int addl_33     OPCODE_FUNC
 int subl_34     OPCODE_FUNC
+int subl_35     OPCODE_FUNC
 int mull_36     OPCODE_FUNC
+int mull_37     OPCODE_FUNC
+int divl_38     OPCODE_FUNC
+int divl_39     OPCODE_FUNC
+int reml_40     OPCODE_FUNC
+int reml_41     OPCODE_FUNC
 int addd_43     OPCODE_FUNC
 int muld_45     OPCODE_FUNC
 int divd_46     OPCODE_FUNC

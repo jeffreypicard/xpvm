@@ -355,8 +355,9 @@ int subl_34( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int subl_35( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  reg[ri] = (long)reg[rj] - (long)const8;
   return 1;
 }
 
@@ -368,32 +369,37 @@ int mull_36( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int mull_37( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  reg[ri] = (long)reg[rj] * (long)const8;
   return 1;
 }
 
 int divl_38( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  reg[ri] = (long)reg[rj] / (long)reg[rk];
   return 1;
 }
 
 int divl_39( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  reg[ri] = (long)reg[rj] / (long)const8;
   return 1;
 }
 
 int reml_40( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  reg[ri] = (long)reg[rj] % (long)reg[rk];
   return 1;
 }
 
 int reml_41( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  reg[ri] = (long)reg[rj] % (long)const8;
   return 1;
 }
 
