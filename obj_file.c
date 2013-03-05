@@ -111,9 +111,7 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
   uint64_t annots               = 0;
   uint64_t owner                = 0;
   uint8_t  *b_data              = 0;
-#if DEBUG_XPVM
   uint8_t  temp                 = 0;
-#endif
 
   int i = 0;
   /* Read name string from block */
@@ -127,8 +125,6 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
 #endif
 
   /* Read trait annotations */
-  /*for( i = 0; i < 8; i++ )
-    annots |=  ( (uint64_t)fgetc( fp ) << (64 - (i+1)*8) );*/
   READ_INT64_LITTLE_ENDIAN( annots, fp );
 
 #if DEBUG_XPVM
@@ -136,8 +132,6 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
 #endif
 
   /* Read frame size */
-  /*for( i = 0; i < 4; i++ )
-    frame_size |=  ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
   READ_INT32_LITTLE_ENDIAN( frame_size, fp );
 
 #if DEBUG_XPVM
@@ -145,8 +139,6 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
 #endif
 
   /* Read contents length */
-  /*for( i = 0; i < 4; i++ )
-    length |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
   READ_INT32_LITTLE_ENDIAN( length, fp );
 
 #if DEBUG_XPVM
@@ -173,35 +165,48 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
   }
 
   /* Read number of exception handlers */
-  /*for( i = 0; i < 4; i++ )
-    num_except_handlers |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
   READ_INT32_LITTLE_ENDIAN( num_except_handlers, fp );
 
 #if DEBUG_XPVM
   fprintf( stderr, "num_except_handlers: %08x\n", num_except_handlers );
 #endif
 
+  for( i = 0; i < num_except_handlers; i++ )
+  {
+    READ_INT32_LITTLE_ENDIAN( temp, fp );
+    READ_INT32_LITTLE_ENDIAN( temp, fp );
+    READ_INT32_LITTLE_ENDIAN( temp, fp );
+  }
+
   /* Read number of outsymbol references */
-  /*for( i = 0; i < 4; i++ )
-    num_outsymbol_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
   READ_INT32_LITTLE_ENDIAN( num_outsymbol_refs, fp );
 
 #if DEBUG_XPVM
   fprintf( stderr, "num_outsymbol_refs: %08x\n", num_outsymbol_refs );
 #endif
 
+  for( i = 0; i < num_outsymbol_refs; i++ )
+  {
+    /* Read until null */
+    while( fgetc(fp) );
+    READ_INT32_LITTLE_ENDIAN( temp, fp );
+  }
+
   /* Read number of native function references */
-  /*for( i = 0; i < 4; i++ )
-    num_native_refs |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
   READ_INT32_LITTLE_ENDIAN( num_native_refs, fp );
 
 #if DEBUG_XPVM
   fprintf( stderr, "num_outsymbol_refs: %08x\n", num_outsymbol_refs );
 #endif
 
+  for( i = 0; i < num_outsymbol_refs; i++ )
+  {
+    /* Read until null */
+    while( fgetc(fp) );
+    READ_INT32_LITTLE_ENDIAN( temp, fp );
+  }
+
   /* Read length of auxiliary data */
-  /*for( i = 0; i < 4; i++ )
-    length_aux_data |= ( (uint32_t)fgetc( fp ) << (32 - (i+1)*8) );*/
   READ_INT32_LITTLE_ENDIAN( length_aux_data, fp );
 
 #if DEBUG_XPVM
