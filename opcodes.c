@@ -628,85 +628,132 @@ int ornot_59( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int cmpeq_64( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  int64_t x, y;
+  x = reg[rj];
+  y = reg[rk];
+  reg[ri] = (x == y);
   return 1;
 }
 
 int cmpeq_65( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  int64_t x, y;
+  x = reg[rj];
+  y = (int64_t)(int8_t)const8;
+  reg[ri] = (x == y);
   return 1;
 }
 
 int cmple_66( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  int64_t x, y;
+  x = reg[rj];
+  y = reg[rk];
+  reg[ri] = (x <= y);
   return 1;
 }
 
 int cmple_67( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  int64_t x, y;
+  x = reg[rj];
+  y = (int64_t)(int8_t)const8;
+  reg[ri] = (x <= y);
   return 1;
 }
 
 int cmplt_68( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
-  reg[ri] = (reg[rj] < reg[rk] );
-#if DEBUG_XPVM
-  fprintf( stderr, "reg[ri]: %lld\nreg[rj]: %lld\n reg[rk]: %lld\n",
-                   reg[ri], reg[rj], reg[rk] );
-#endif
+  int64_t x, y;
+  x = reg[rj];
+  y = reg[rk];
+  reg[ri] = (x < y);
   return 1;
 }
 
 int cmplt_69( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  int64_t x, y;
+  x = reg[rj];
+  y = (int64_t)(int8_t)const8;
+  reg[ri] = (x < y);
   return 1;
 }
 
 int cmpule_70( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  uint64_t x, y;
+  x = reg[rj];
+  y = reg[rk];
+  reg[ri] = (x <= y);
   return 1;
 }
 
 int cmpule_71( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  uint64_t x, y;
+  x = reg[rj];
+  y = (uint64_t)const8;
+  reg[ri] = (x <= y);
   return 1;
 }
 
 int cmpult_72( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  uint64_t x, y;
+  x = reg[rj];
+  y = reg[rk];
+  reg[ri] = (x < y);
   return 1;
 }
 
 int cmpult_73( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  uint64_t x, y;
+  x = reg[rj];
+  y = (uint64_t)const8;
+  reg[ri] = (x < y);
   return 1;
 }
 
 int fcmpeq_74( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  double x, y;
+  x = *(double*)&reg[rj];
+  y = *(double*)&reg[rk];
+  reg[ri] = (x == y);
   return 1;
 }
 
 int fcmple_75( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  double x, y;
+  x = *(double*)&reg[rj];
+  y = *(double*)&reg[rk];
+  reg[ri] = (x <= y);
   return 1;
 }
 
 int fcmplt_76( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  double x, y;
+  x = *(double*)&reg[rj];
+  y = *(double*)&reg[rk];
+  reg[ri] = (x < y);
   return 1;
 }
 
