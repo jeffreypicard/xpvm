@@ -14,11 +14,12 @@
 0000 0000                   # Annotations, executable
 0000 0002 
 0000 0000                   # Frame size
-0000 0048                   # Contents length
+0000 0078                   # Contents length
 0e01 0029                   # ldimm   r01 <-- $0029 
 0e02 0001                   # ldimm   r02 <-- $0001  
 0ea0 0000                   # ldimm   ra0 <-- $0000 
 0ea1 0003                   # ldimm   ra1 <-- $0003 
+0ea2 0000                   # ldimm   ra2 <-- $0000 
 #
 2001 01a0                   # addl    r01 <-- r01 + ra0 
 2101 0100                   # addl    r01 <-- r01 + $00 
@@ -28,13 +29,26 @@
 2501 0101                   # mull    r01 <-- r01 * $01 
 2601 0102                   # divl    r01 <-- r01 / r02 
 2701 0101                   # divl    r01 <-- r01 / $01 
-2801 a102                   # reml    r01 <-- ra1 % r02 
-2901 a101                   # reml    r01 <-- ra1 % $01 
-#
+28a0 a102                   # reml    ra0 <-- ra1 % r02 
+29a0 a101                   # reml    ra0 <-- ra1 % $01 
+2a01 01ff                   # negl    r01 <-- -r01 
+2a01 01ff                   # negl    r01 <-- -r01 
+# Swtich over to doubles
+2001 01a0                   # addl    r01 <-- r01 + ra0 
 3003 0100                   # cvtld   r03 <-- r01 
 3004 0200                   # cvtld   r04 <-- r02 
+30a2 a200                   # cvtld   ra2 <-- ra2 
 #
-2b05 0304                   # addd    r05 <-- r03 + r04 
+2b05 0304                   # addd    r05 <-- r03 + r04 (42 here)
+2c05 05a2                   # addd    r05 <-- r05 - ra2 
+2d05 0504                   # muld    r05 <-- r05 * r04 
+2e05 0504                   # divd    r05 <-- r05 / r04 
+2f05 05ff                   # divd    r05 <-- -r05 
+2f05 05ff                   # divd    r05 <-- -r05 
+# Switch back to longs 
+3101 01ff                   # cvtdl   r01 <-- r01 
+# And back to doubles
+3001 01ff                   # cvtdl   r01 <-- r01 
 #
 74ff 05ff                   # ret     r05 
 0000 0000                   # unsigned number of exception handlers

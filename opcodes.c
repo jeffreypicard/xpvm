@@ -393,6 +393,9 @@ int reml_40( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   reg[ri] = (long)reg[rj] % (long)reg[rk];
+#if DEBUG_XPVM
+  fprintf( stderr, "::\t%ld, %ld, %ld\n", reg[ri], (long)reg[rj], (long)reg[rk]);
+#endif
   return 1;
 }
 
@@ -400,12 +403,16 @@ int reml_41( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   reg[ri] = (long)reg[rj] % (long)const8;
+#if DEBUG_XPVM
+  fprintf( stderr, "::\t%ld, %ld, %ld\n", reg[ri], (long)reg[rj], (long)const8);
+#endif
   return 1;
 }
 
 int negl_42( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  reg[ri] = -(*(long*)&reg[rj]);
   return 1;
 }
 
@@ -433,27 +440,30 @@ int addd_43( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int subd_44( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  double m, n, r;
+  m = *(double*)&reg[rj];
+  n = *(double*)&reg[rk];
+  r = m - n;
+  reg[ri] = *(uint64_t*)&r;
   return 1;
 }
 
 int muld_45( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
-  double m, n, result;
+  double m, n, r;
 
   m = *(double*) &reg[rj];
-  n  = *(double*) &reg[rk];
-
-  result = m * n;
+  n = *(double*) &reg[rk];
+  r = m * n;
 
 #if DEBUG_XPVM
   fprintf( stderr, "m: %f\nn: %f\nr: %f\n",
                    m, n, result );
 #endif
-
-  reg[ri] = *(uint64_t*) &result;
+  reg[ri] = *(uint64_t*) &r;
 #if DEBUG_XPVM
   fprintf( stderr, "reg[ri]: %f\n", *(double*) &reg[ri] );
 #endif
@@ -487,15 +497,19 @@ int divd_46( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int negd_47( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  double n;
+  n = -(*(double*)&reg[rj]);
+  reg[ri] = *(uint64_t*)&n;
   return 1;
 }
 
 int cvtld_48( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t c4 )
 {
-  double d = (double) reg[rj];
+  double d;
+  d = (double) reg[rj];
   reg[ri] =  *(uint64_t*)&d;
 #if DEBUG_XPVM
   fprintf( stderr, "reg[ri]: %f\n", *(double*)&reg[ri]);
@@ -504,8 +518,11 @@ int cvtld_48( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int cvtdl_49( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t c4 )
 {
+  long l;
+  l = (long) reg[rj];
+  reg[ri] = *(uint64_t*)&l;
   return 1;
 }
 

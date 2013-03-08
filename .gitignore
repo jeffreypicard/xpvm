@@ -13,6 +13,7 @@ test_files/hex_to_obj
 *.swo
 # object files
 *.o
+*.obj
 # library files
 *.so
 #temp files
