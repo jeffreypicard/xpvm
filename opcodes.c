@@ -768,8 +768,9 @@ int jmp_80( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int jmp_81( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  CIO = CIO + reg[rj] + (reg[rk] * 4);
   return 1;
 }
 
