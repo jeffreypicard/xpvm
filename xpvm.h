@@ -256,6 +256,12 @@ int divd_46       OPCODE_FUNC
 int negd_47       OPCODE_FUNC
 int cvtld_48      OPCODE_FUNC
 int cvtdl_49      OPCODE_FUNC
+int lshift_50     OPCODE_FUNC
+int lshift_51     OPCODE_FUNC
+int rshift_52     OPCODE_FUNC
+int rshift_53     OPCODE_FUNC
+int rshiftu_54    OPCODE_FUNC
+int rshiftu_55    OPCODE_FUNC
 int cmplt_68      OPCODE_FUNC
 int jmp_80        OPCODE_FUNC
 int btrue_82      OPCODE_FUNC

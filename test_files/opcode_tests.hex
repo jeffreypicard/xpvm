@@ -14,7 +14,7 @@
 0000 0000                   # Annotations, executable
 0000 0002 
 0000 0000                   # Frame size
-0000 0078                   # Contents length
+0000 0088                   # Contents length
 0e01 0029                   # ldimm   r01 <-- $0029 
 0e02 0001                   # ldimm   r02 <-- $0001  
 0ea0 0000                   # ldimm   ra0 <-- $0000 
@@ -43,12 +43,17 @@
 2c05 05a2                   # addd    r05 <-- r05 - ra2 
 2d05 0504                   # muld    r05 <-- r05 * r04 
 2e05 0504                   # divd    r05 <-- r05 / r04 
-2f05 05ff                   # divd    r05 <-- -r05 
-2f05 05ff                   # divd    r05 <-- -r05 
+2f05 05ff                   # negd    r05 <-- -r05 
+2f05 05ff                   # negd    r05 <-- -r05 
 # Switch back to longs 
-3101 01ff                   # cvtdl   r01 <-- r01 
+3105 05ff                   # cvtdl   r05 <-- r05 
+#
+3205 0502                   # lshift  r01 <-- r01 << r02 
+3305 0501                   # lshift  r01 <-- r01 << $01 
+3405 0502                   # lshift  r01 <-- r01 >> r02 
+3505 0501                   # lshift  r01 <-- r01 >> $01 
 # And back to doubles
-3001 01ff                   # cvtdl   r01 <-- r01 
+3005 05ff                   # cvtdl   r05 <-- r05 
 #
 74ff 05ff                   # ret     r05 
 0000 0000                   # unsigned number of exception handlers

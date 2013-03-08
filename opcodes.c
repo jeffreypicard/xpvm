@@ -512,7 +512,8 @@ int cvtld_48( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   d = (double) reg[rj];
   reg[ri] =  *(uint64_t*)&d;
 #if DEBUG_XPVM
-  fprintf( stderr, "reg[ri]: %f\n", *(double*)&reg[ri]);
+  fprintf( stderr, "cvtld: reg[rj]: %d\n", reg[rj]);
+  fprintf( stderr, "cvtld: reg[ri]: %f\n", *(double*)&reg[ri]);
 #endif
   return 1;
 }
@@ -521,68 +522,99 @@ int cvtdl_49( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t c4 )
 {
   long l;
-  l = (long) reg[rj];
+  l = (long)*(double*)&reg[rj];
   reg[ri] = *(uint64_t*)&l;
+#if DEBUG_XPVM
+  fprintf( stderr, "cvtdl: reg[rj]: %f\n", *(double*)&reg[rj]);
+  fprintf( stderr, "cvtdl: reg[ri]: %d\n", reg[ri]);
+#endif
   return 1;
 }
 
+/* FIXME: Can you do negative shifts? */
 int lshift_50( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  uint64_t x, r;
+  int64_t s;
+  x = reg[rj];
+  s = reg[rk];
+  r = x << (s % 64);
+  reg[ri] = r;
   return 1;
 }
 
 int lshift_51( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  uint64_t x, r;
+  x = reg[rj];
+  r = x << (const8 % 64);
+  reg[ri] = r;
   return 1;
 }
 
 int rshift_52( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  int64_t x, r;
+  int64_t s;
+  x = reg[rj];
+  s = reg[rk];
+  r = x >> (s % 64);
+  reg[ri] = r;
   return 1;
 }
 
 int rshift_53( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  int64_t x, r;
+  x = reg[rj];
+  r = x >> (const8 % 64);
+  reg[ri] = r;
   return 1;
 }
 
 int rshiftu_54( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
+  uint64_t x;
   return 1;
 }
 
 int rshiftu_55( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
+  uint64_t x;
   return 1;
 }
 
 int and_56( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
+  uint64_t x, y;
   return 1;
 }
 
 int or_57( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
+  uint64_t x, y;
   return 1;
 }
 
 int xor_58( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
+  uint64_t x, y;
   return 1;
 }
 
 int ornot_59( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
+  uint64_t x, y;
   return 1;
 }
 
