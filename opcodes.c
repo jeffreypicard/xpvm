@@ -536,7 +536,7 @@ int lshift_50( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   uint64_t x, r;
-  int64_t s;
+  uint64_t s;
   x = reg[rj];
   s = reg[rk];
   r = x << (s % 64);
@@ -558,7 +558,7 @@ int rshift_52( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   int64_t x, r;
-  int64_t s;
+  uint64_t s;
   x = reg[rj];
   s = reg[rk];
   r = x >> (s % 64);
@@ -577,16 +577,25 @@ int rshift_53( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int rshiftu_54( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
-  uint64_t x;
+  uint64_t x, r;
+  uint64_t s;
+  x = reg[rj];
+  s = reg[rk];
+  r = x >> (s % 64);
+  reg[ri] = r;
   return 1;
 }
 
 int rshiftu_55( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
-  uint64_t x;
+  uint64_t x, r;
+  x = reg[rj];
+  r = x >> (const8 % 64);
+  reg[ri] = r;
+  return 1;
   return 1;
 }
 
