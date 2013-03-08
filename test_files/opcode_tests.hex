@@ -14,7 +14,7 @@
 0000 0000                   # Annotations, executable
 0000 0002 
 0000 0000                   # Frame size
-0000 0088                   # Contents length
+0000 00a8                   # Contents length
 0e01 0029                   # ldimm   r01 <-- $0029 
 0e02 0001                   # ldimm   r02 <-- $0001  
 0ea0 0000                   # ldimm   ra0 <-- $0000 
@@ -48,10 +48,18 @@
 # Switch back to longs 
 3105 05ff                   # cvtdl   r05 <-- r05 
 #
-3205 0502                   # lshift  r01 <-- r01 << r02 
-3305 0501                   # lshift  r01 <-- r01 << $01 
-3405 0502                   # lshift  r01 <-- r01 >> r02 
-3505 0501                   # lshift  r01 <-- r01 >> $01 
+3205 0502                   # lshift  r05 <-- r05 << r02 
+3305 0501                   # lshift  r05 <-- r05 << $01 
+3205 0502                   # lshift  r05 <-- r05 << r02 
+3305 0501                   # lshift  r05 <-- r05 << $01 
+3405 0502                   # rshift  r05 <-- r05 >> r02 
+3505 0501                   # rshift  r05 <-- r05 >> $01 
+3605 0502                   # rshiftu r05 <-- r05 >> r02 
+3705 0501                   # rshiftu r05 <-- r05 >> $01 
+3bb0 a0a0                   # ornot   rb0 <-- ra0 | ~ra0 
+3ab0 a0b0                   # xor     rb0 <-- ra0 ^ rb0 
+3805 05b0                   # and     r05 <-- r05 & rb0 
+3905 05a0                   # or      r05 <-- r05 | ra0 
 # And back to doubles
 3005 05ff                   # cvtdl   r05 <-- r05 
 #

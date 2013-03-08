@@ -262,6 +262,10 @@ int rshift_52     OPCODE_FUNC
 int rshift_53     OPCODE_FUNC
 int rshiftu_54    OPCODE_FUNC
 int rshiftu_55    OPCODE_FUNC
+int and_56        OPCODE_FUNC
+int or_57         OPCODE_FUNC
+int xor_58        OPCODE_FUNC
+int ornot_59      OPCODE_FUNC
 int cmplt_68      OPCODE_FUNC
 int jmp_80        OPCODE_FUNC
 int btrue_82      OPCODE_FUNC
