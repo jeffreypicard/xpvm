@@ -805,19 +805,46 @@ int bfalse_83( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   return 1;
 }
 
-int malloc_96( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
+/* FIXME: Hacked together functions and macros to make malloc work.
+ * Clean this up at some point.
+ */
+int valid_bid( uint64_t id )
+{
+  return 1;
+}
+
+#define SET_BLOCK_OWNED( b ) do {                     \
+  BLOCK_ANNOTS( b ) = BLOCK_ANNOTS( b ) & OWNED_MASK; \
+} while(0)
+
+#define SET_BLOCK_CHAINED( b, id ) do {             \
+  BLOCK_ANNOTS(b) = BLOCK_ANNOTS(b) & CHAINED_MASK; \
+  if( ! valid_bid( id ) )                           \
+    EXIT_WITH_ERROR("Error: Invalid block ID!\b");  \
+  uint64_t p_id = id;                               \
+  while( BLOCK_CHAIN(p_id) )                        \
+    p_id = BLOCK_CHAIN(p_id);                       \
+  BLOCK_CHAIN(b) = p_id;                            \
+} while(0)
+
+int alloc_blk_96( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  uint8_t *b;
+
   pthread_mutex_lock( &malloc_xpvm_mu );
 
-  reg[ri] = malloc_xpvm( reg[rj] );
+  b = (uint8_t*)malloc_xpvm( reg[rj] );
+  BLOCK_OWNER( b ) = proc_id;
+  BLOCK_LENGTH( b ) = reg[ri];
+  if( ! reg[rk] )
+    SET_BLOCK_OWNED( b );
+  else
+    SET_BLOCK_CHAINED( b, reg[rk] );
+  reg[ri] = (uint64_t)(uint64_t*) b;
 
   pthread_mutex_unlock( &malloc_xpvm_mu );
 
-  uint8_t *b = (uint8_t*) CAST_INT reg[ri];
-  BLOCK_OWNER( b ) = proc_id;
-  BLOCK_LENGTH( b ) = reg[ri];
-  BLOCK_ANNOTS( b ) = reg[rk];
   return 1;
 }
 
@@ -1023,13 +1050,13 @@ int retrieve_129( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   return 1;
 }
 
-int initProc_144( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
+int init_proc_144( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   int i = 0;
   uint64_t *args = calloc( const8+1, sizeof(uint64_t) );
   if( !args )
-    EXIT_WITH_ERROR("Error: malloc failed in initProc_144\n");
+    EXIT_WITH_ERROR("Error: malloc failed in init_proc_144\n");
 
   for( i = 0; i <= const8; i++  )
     args[i] = reg[i];

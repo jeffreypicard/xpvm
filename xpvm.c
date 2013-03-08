@@ -90,7 +90,7 @@ int load_c_lib( void )
 /*
  * do_init_proc
  *
- * C function implementation of the initProc
+ * C function implementation of the init_proc
  * opcode. also used to start the VM executing
  * the main function.
  */
@@ -218,7 +218,7 @@ static void *fetch_execute(void *v)
 
   int i = 0;
   int len = 0;
-  cmdArg *ar1 = NULL, *ar2 = NULL;
+  cmd_arg *ar1 = NULL, *ar2 = NULL;
   /* Inialize the VM to run */
   uint64_t reg[NUM_REGS];
   reg[BLOCK_REG] = (uint64_t) CAST_INT block_ptr;
@@ -260,9 +260,9 @@ static void *fetch_execute(void *v)
 #endif
     for( i = 1; i <= argc && i < 11; i++ )
     {
-      ar1 = ((cmdArg*) CAST_INT (reg_bank+i));
+      ar1 = ((cmd_arg*) CAST_INT (reg_bank+i));
       len = strlen( ar1->s );
-      ar2 = calloc( 1, sizeof(cmdArg) + len + 1 );
+      ar2 = calloc( 1, sizeof(cmd_arg) + len + 1 );
       if( !ar2 )
         EXIT_WITH_ERROR("Error: malloc failed in do_init_proc\n");
       strcpy( ar2->s, ar1->s );

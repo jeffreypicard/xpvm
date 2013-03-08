@@ -150,17 +150,18 @@ struct _block
  * to the requested header info.
  */
 #define BLOCK_OWNER( b ) *(uint64_t*)(b - 8)
-#define BLOCK_ANNOTS( b ) *(uint64_t*)(b - 16)
-#define BLOCK_AUX_LENGTH( b ) *(uint32_t*)(b - 20)
-#define BLOCK_OUT_SYM_REFS( b ) *(uint32_t*)(b - 24)
+#define BLOCK_CHAIN( b ) *(uint64_t*)(b - 16)
+#define BLOCK_ANNOTS( b ) *(uint64_t*)(b - 24)
+#define BLOCK_AUX_LENGTH( b ) *(uint32_t*)(b - 24)
+#define BLOCK_OUT_SYM_REFS( b ) *(uint32_t*)(b - 28)
 /* Pointer to allocated chunk of memory, or null */
-#define BLOCK_EXCEPT_HANDLERS( b ) *(uint64_t*)(b - 32)
+#define BLOCK_EXCEPT_HANDLERS( b ) *(uint64_t*)(b - 34)
 /* Pointer to allocated chunk of memory, or null */
-#define BLOCK_NATIVE_REFS( b ) *(uint64_t*)(b - 40)
-#define BLOCK_FRAME_SIZE( b ) *(uint32_t*)(b - 44)
-#define BLOCK_LENGTH( b ) *(uint32_t*)(b - 48)
+#define BLOCK_NATIVE_REFS( b ) *(uint64_t*)(b - 44)
+#define BLOCK_FRAME_SIZE( b ) *(uint32_t*)(b - 48)
+#define BLOCK_LENGTH( b ) *(uint32_t*)(b - 52)
 
-#define BLOCK_HEADER_LENGTH 48
+#define BLOCK_HEADER_LENGTH 52
 
 /*
  * Macros defining masks used in checking annotations
@@ -169,21 +170,24 @@ struct _block
 #define MX_RD_ONLY_MASK   0x0200000000000000
 #define MX_LCK_RQD_MASK   0x0300000000000000
 
-#define UNKNOWABLE_MASK   0x0000000000000001
+#define UNOWNABLE_MASK    0x0000000000000001
 #define INST_MASK         0x0000000000000002
+#define OWNED_MASK        0x0000000000000003
+#define CHAINED_MASK      0x0000000000000004
 
 /*
  * Macros for checking annotations
  */
 #define CHECK_INST_ANNOT( b ) INST_MASK & BLOCK_ANNOTS( b )
+#define CHECK_OWNED( b ) OWNED_MASK & BLOCK_ANNOTS( b )
 
 /*
  * Struct to hold the arguments passed to doProcInit.
  */
-struct _cmdArg
+struct _cmd_arg
 {
   char s[0];
-} typedef cmdArg;
+} typedef cmd_arg;
 
 /*
  * Struct for passing back the exit status and return value
@@ -224,59 +228,59 @@ void *__lh;
 #define OPCODE_FUNC ( unsigned int proc_id, uint64_t *reg, stack_frame **stak, \
                     uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
 
-int ldb_2         OPCODE_FUNC
-int ldb_3         OPCODE_FUNC
-int lds_4         OPCODE_FUNC
-int lds_5         OPCODE_FUNC
-int ldi_6         OPCODE_FUNC
-int ldi_7         OPCODE_FUNC
-int ldl_8         OPCODE_FUNC
-int ldl_9         OPCODE_FUNC
-int ldimm_14      OPCODE_FUNC
-int ldimm2_15     OPCODE_FUNC
-int stb_16        OPCODE_FUNC
-int stb_17        OPCODE_FUNC
-int sti_21        OPCODE_FUNC
-int ldblkid_28    OPCODE_FUNC
-int addl_32       OPCODE_FUNC
-int addl_33       OPCODE_FUNC
-int subl_34       OPCODE_FUNC
-int subl_35       OPCODE_FUNC
-int mull_36       OPCODE_FUNC
-int mull_37       OPCODE_FUNC
-int divl_38       OPCODE_FUNC
-int divl_39       OPCODE_FUNC
-int reml_40       OPCODE_FUNC
-int reml_41       OPCODE_FUNC
-int negl_42       OPCODE_FUNC
-int addd_43       OPCODE_FUNC
-int subd_44       OPCODE_FUNC
-int muld_45       OPCODE_FUNC
-int divd_46       OPCODE_FUNC
-int negd_47       OPCODE_FUNC
-int cvtld_48      OPCODE_FUNC
-int cvtdl_49      OPCODE_FUNC
-int lshift_50     OPCODE_FUNC
-int lshift_51     OPCODE_FUNC
-int rshift_52     OPCODE_FUNC
-int rshift_53     OPCODE_FUNC
-int rshiftu_54    OPCODE_FUNC
-int rshiftu_55    OPCODE_FUNC
-int and_56        OPCODE_FUNC
-int or_57         OPCODE_FUNC
-int xor_58        OPCODE_FUNC
-int ornot_59      OPCODE_FUNC
-int cmplt_68      OPCODE_FUNC
-int jmp_80        OPCODE_FUNC
-int btrue_82      OPCODE_FUNC
-int bfalse_83     OPCODE_FUNC
-int malloc_96     OPCODE_FUNC
-int ldfunc_112    OPCODE_FUNC
-int call_114      OPCODE_FUNC
-int calln_115     OPCODE_FUNC
-int ret_116       OPCODE_FUNC
-int initProc_144  OPCODE_FUNC
-int join_145      OPCODE_FUNC
+int ldb_2             OPCODE_FUNC
+int ldb_3             OPCODE_FUNC
+int lds_4             OPCODE_FUNC
+int lds_5             OPCODE_FUNC
+int ldi_6             OPCODE_FUNC
+int ldi_7             OPCODE_FUNC
+int ldl_8             OPCODE_FUNC
+int ldl_9             OPCODE_FUNC
+int ldimm_14          OPCODE_FUNC
+int ldimm2_15         OPCODE_FUNC
+int stb_16            OPCODE_FUNC
+int stb_17            OPCODE_FUNC
+int sti_21            OPCODE_FUNC
+int ldblkid_28        OPCODE_FUNC
+int addl_32           OPCODE_FUNC
+int addl_33           OPCODE_FUNC
+int subl_34           OPCODE_FUNC
+int subl_35           OPCODE_FUNC
+int mull_36           OPCODE_FUNC
+int mull_37           OPCODE_FUNC
+int divl_38           OPCODE_FUNC
+int divl_39           OPCODE_FUNC
+int reml_40           OPCODE_FUNC
+int reml_41           OPCODE_FUNC
+int negl_42           OPCODE_FUNC
+int addd_43           OPCODE_FUNC
+int subd_44           OPCODE_FUNC
+int muld_45           OPCODE_FUNC
+int divd_46           OPCODE_FUNC
+int negd_47           OPCODE_FUNC
+int cvtld_48          OPCODE_FUNC
+int cvtdl_49          OPCODE_FUNC
+int lshift_50         OPCODE_FUNC
+int lshift_51         OPCODE_FUNC
+int rshift_52         OPCODE_FUNC
+int rshift_53         OPCODE_FUNC
+int rshiftu_54        OPCODE_FUNC
+int rshiftu_55        OPCODE_FUNC
+int and_56            OPCODE_FUNC
+int or_57             OPCODE_FUNC
+int xor_58            OPCODE_FUNC
+int ornot_59          OPCODE_FUNC
+int cmplt_68          OPCODE_FUNC
+int jmp_80            OPCODE_FUNC
+int btrue_82          OPCODE_FUNC
+int bfalse_83         OPCODE_FUNC
+int alloc_blk_96      OPCODE_FUNC
+int ldfunc_112        OPCODE_FUNC
+int call_114          OPCODE_FUNC
+int calln_115         OPCODE_FUNC
+int ret_116           OPCODE_FUNC
+int init_proc_144     OPCODE_FUNC
+int join_145          OPCODE_FUNC
 
 /*************************** Native functions ****************************/
 
