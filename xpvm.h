@@ -14,7 +14,7 @@
 
 /*************************** Macros ********************************/
 
-#define DEBUG_XPVM 0
+#define DEBUG_XPVM  0
 
 #define MAX_REGS      256
 #define HIDDEN_REGS   4
@@ -36,6 +36,8 @@
 #define RET_OPCODE 0x74
 
 #define CAST_INT (uint64_t)
+
+#define u64 uint64_t
 
 /* FIXME: This relies on the index varialbe i already being defined
  * This read a 32 bit integer from the object file INTO a little endian
@@ -172,14 +174,120 @@ struct _block
 
 #define UNOWNABLE_MASK    0x0000000000000001
 #define INST_MASK         0x0000000000000002
-#define OWNED_MASK        0x0000000000000003
 #define CHAINED_MASK      0x0000000000000004
+#define OWNED_MASK        0x0000000000000008
+#define PRIVATE_MASK      0x0000000000000010 
+#define VOLATILE_MASK     0x0000000000000020 
 
+#if CHECKS
 /*
  * Macros for checking annotations
  */
 #define CHECK_INST_ANNOT( b ) INST_MASK & BLOCK_ANNOTS( b )
+#define CHECK_EXEC( b ) INST_MASK & BLOCK_ANNOTS( b )
+#define CHECK_PRIVATE( b ) PRIVATE_MASK & BLOCK_ANNOTS( b )
 #define CHECK_OWNED( b ) OWNED_MASK & BLOCK_ANNOTS( b )
+#define CHECK_FREE( b ) !(OWNED_MASK & BLOCK_ANNOTS( b ))
+#define CHECK_VOLATILE( b ) VOLATILE_MASK & BLOCK_ANNOTS( b )
+#define CHECK_OWNED_VOLATILE(b) CHECK_OWNED(b) && CHECK_VOLATILE(b)
+#define CHECK_FREE_VOLATILE(b) CHECK_FREE(b) && CHECK_VOLATILE(b)
+
+#define CHECK_READ_ANNOTS( pid, b ) do {                        \
+  if( CHECK_PRIVATE(b) && !(pid == BLOCK_OWNER(b)) )            \
+    EXIT_WITH_ERROR("Error: proc %d attempted to read "         \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  if( CHECK_OWNED(b) && !(pid == BLOCK_OWNER(b)) )              \
+    EXIT_WITH_ERROR("Error: proc %d attempted to read "         \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  if( CHECK_FREE(b) && !(CHECK_VOLATILE(b)) )                   \
+    EXIT_WITH_ERROR("Error: proc %d attempted to read "         \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+}while(0)
+
+#define CHECK_WRITE_ANNOTS( pid, b ) do {                       \
+  if( CHECK_PRIVATE(b) && !(pid == BLOCK_OWNER(b)) )            \
+    EXIT_WITH_ERROR("Error: proc %d attempted to write "        \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  if( CHECK_OWNED(b) && !(pid == BLOCK_OWNER(b)) )              \
+    EXIT_WITH_ERROR("Error: proc %d attempted to write "        \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  if( CHECK_FREE(b) )                                           \
+    EXIT_WITH_ERROR("Error: proc %d attempted to write "        \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+}while(0)
+
+#define CHECK_EXEC_ANNOTS(pid, b) do {                          \
+  if( !(CHECK_EXEC(b)) )                                        \
+    EXIT_WITH_ERROR("Error: proc %d attempted to execute "      \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+}while(0);
+
+#define CHECK_RELEASE_ANNOTS( pid, b ) do {                     \
+  if( CHECK_FREE(b) )                                           \
+    EXIT_WITH_ERROR("Error: proc %d attempted to release "      \
+                    "free block %p\n",                          \
+                    pid, b );                                   \
+  if( CHECK_OWNED(b) && !(pid == BLOCK_OWNER(b)) )              \
+    EXIT_WITH_ERROR("Error: proc %d attempted to realse "       \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  if( ! valid_bid((u64)b) )                                     \
+    EXIT_WITH_ERROR("Error: %p is not a valid block\n",         \
+                    b);                                         \
+}while(0)
+
+#else //CHECKS
+
+#define CHECK_INST_ANNOT( b ) {}
+#define CHECK_PRIVATE( b ) {}
+#define CHECK_OWNED( b ) {}
+#define CHECK_FREE( b ) {}
+#define CHECK_VOLATILE( b ) {}
+#define CHECK_OWNED_VOLATILE(b) {}
+#define CHECK_FREE_VOLATILE(b) {}
+
+#define CHECK_READ_ANNOTS( pid, b ) {}
+#define CHECK_WRITE_ANNOTS( pid, b ) {}
+#define CHECK_EXEC_ANNOTS(pid, b) {}
+
+#endif //CHECKS
+
+/*
+ * Macros for setting annotations
+ */
+#define SET_BLOCK_OWNED( b ) do {                     \
+  BLOCK_ANNOTS( b ) = BLOCK_ANNOTS( b ) | OWNED_MASK; \
+} while(0)
+
+#define SET_BLOCK_FREE( b ) do {                        \
+  BLOCK_ANNOTS( b ) = BLOCK_ANNOTS( b ) & ~OWNED_MASK;  \
+} while(0)
+
+#define SET_BLOCK_VOLATILE( b ) do {                     \
+  BLOCK_ANNOTS( b ) = BLOCK_ANNOTS( b ) | VOLATILE_MASK; \
+} while(0)
+
+#define SET_BLOCK_PRIVATE( b ) do {                   \
+  BLOCK_ANNOTS(b) = BLOCK_ANNOTS(b) | PRIVATE_MASK;   \
+} while(0)
+
+#define SET_BLOCK_CHAINED( b, id ) do {             \
+  BLOCK_ANNOTS(b) = BLOCK_ANNOTS(b) | CHAINED_MASK; \
+  if( ! valid_bid( id ) )                           \
+    EXIT_WITH_ERROR("Error: Invalid block ID!\b");  \
+  uint64_t p_id = id;                               \
+  while( BLOCK_CHAIN(p_id) )                        \
+    p_id = BLOCK_CHAIN(p_id);                       \
+  BLOCK_CHAIN(b) = p_id;                            \
+} while(0)
+
 
 /*
  * Struct to hold the arguments passed to doProcInit.
@@ -228,59 +336,61 @@ void *__lh;
 #define OPCODE_FUNC ( unsigned int proc_id, uint64_t *reg, stack_frame **stak, \
                     uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
 
-int ldb_2             OPCODE_FUNC
-int ldb_3             OPCODE_FUNC
-int lds_4             OPCODE_FUNC
-int lds_5             OPCODE_FUNC
-int ldi_6             OPCODE_FUNC
-int ldi_7             OPCODE_FUNC
-int ldl_8             OPCODE_FUNC
-int ldl_9             OPCODE_FUNC
-int ldimm_14          OPCODE_FUNC
-int ldimm2_15         OPCODE_FUNC
-int stb_16            OPCODE_FUNC
-int stb_17            OPCODE_FUNC
-int sti_21            OPCODE_FUNC
-int ldblkid_28        OPCODE_FUNC
-int addl_32           OPCODE_FUNC
-int addl_33           OPCODE_FUNC
-int subl_34           OPCODE_FUNC
-int subl_35           OPCODE_FUNC
-int mull_36           OPCODE_FUNC
-int mull_37           OPCODE_FUNC
-int divl_38           OPCODE_FUNC
-int divl_39           OPCODE_FUNC
-int reml_40           OPCODE_FUNC
-int reml_41           OPCODE_FUNC
-int negl_42           OPCODE_FUNC
-int addd_43           OPCODE_FUNC
-int subd_44           OPCODE_FUNC
-int muld_45           OPCODE_FUNC
-int divd_46           OPCODE_FUNC
-int negd_47           OPCODE_FUNC
-int cvtld_48          OPCODE_FUNC
-int cvtdl_49          OPCODE_FUNC
-int lshift_50         OPCODE_FUNC
-int lshift_51         OPCODE_FUNC
-int rshift_52         OPCODE_FUNC
-int rshift_53         OPCODE_FUNC
-int rshiftu_54        OPCODE_FUNC
-int rshiftu_55        OPCODE_FUNC
-int and_56            OPCODE_FUNC
-int or_57             OPCODE_FUNC
-int xor_58            OPCODE_FUNC
-int ornot_59          OPCODE_FUNC
-int cmplt_68          OPCODE_FUNC
-int jmp_80            OPCODE_FUNC
-int btrue_82          OPCODE_FUNC
-int bfalse_83         OPCODE_FUNC
-int alloc_blk_96      OPCODE_FUNC
-int ldfunc_112        OPCODE_FUNC
-int call_114          OPCODE_FUNC
-int calln_115         OPCODE_FUNC
-int ret_116           OPCODE_FUNC
-int init_proc_144     OPCODE_FUNC
-int join_145          OPCODE_FUNC
+int ldb_2                     OPCODE_FUNC
+int ldb_3                     OPCODE_FUNC
+int lds_4                     OPCODE_FUNC
+int lds_5                     OPCODE_FUNC
+int ldi_6                     OPCODE_FUNC
+int ldi_7                     OPCODE_FUNC
+int ldl_8                     OPCODE_FUNC
+int ldl_9                     OPCODE_FUNC
+int ldimm_14                  OPCODE_FUNC
+int ldimm2_15                 OPCODE_FUNC
+int stb_16                    OPCODE_FUNC
+int stb_17                    OPCODE_FUNC
+int sti_21                    OPCODE_FUNC
+int ldblkid_28                OPCODE_FUNC
+int addl_32                   OPCODE_FUNC
+int addl_33                   OPCODE_FUNC
+int subl_34                   OPCODE_FUNC
+int subl_35                   OPCODE_FUNC
+int mull_36                   OPCODE_FUNC
+int mull_37                   OPCODE_FUNC
+int divl_38                   OPCODE_FUNC
+int divl_39                   OPCODE_FUNC
+int reml_40                   OPCODE_FUNC
+int reml_41                   OPCODE_FUNC
+int negl_42                   OPCODE_FUNC
+int addd_43                   OPCODE_FUNC
+int subd_44                   OPCODE_FUNC
+int muld_45                   OPCODE_FUNC
+int divd_46                   OPCODE_FUNC
+int negd_47                   OPCODE_FUNC
+int cvtld_48                  OPCODE_FUNC
+int cvtdl_49                  OPCODE_FUNC
+int lshift_50                 OPCODE_FUNC
+int lshift_51                 OPCODE_FUNC
+int rshift_52                 OPCODE_FUNC
+int rshift_53                 OPCODE_FUNC
+int rshiftu_54                OPCODE_FUNC
+int rshiftu_55                OPCODE_FUNC
+int and_56                    OPCODE_FUNC
+int or_57                     OPCODE_FUNC
+int xor_58                    OPCODE_FUNC
+int ornot_59                  OPCODE_FUNC
+int cmplt_68                  OPCODE_FUNC
+int jmp_80                    OPCODE_FUNC
+int btrue_82                  OPCODE_FUNC
+int bfalse_83                 OPCODE_FUNC
+int alloc_blk_96              OPCODE_FUNC
+int alloc_private_blk_97      OPCODE_FUNC
+int release_blk_99            OPCODE_FUNC
+int ldfunc_112                OPCODE_FUNC
+int call_114                  OPCODE_FUNC
+int calln_115                 OPCODE_FUNC
+int ret_116                   OPCODE_FUNC
+int init_proc_144             OPCODE_FUNC
+int join_145                  OPCODE_FUNC
 
 /*************************** Native functions ****************************/
 

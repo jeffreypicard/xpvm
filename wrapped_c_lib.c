@@ -36,6 +36,13 @@ int print_int( unsigned int proc_id, uint64_t *reg, stack_frame **stak,
   return 1;
 }
 
+int print_string( unsigned int proc_id, uint64_t *reg, stack_frame **stak,
+                    uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
+{
+  printf("%s\n", (char*)reg[rj] );
+  return 1;
+}
+
 int xpvm_printf( unsigned int proc_id, uint64_t *reg, stack_frame **stak,
                     uint8_t ri, uint8_t rj, uint8_t c3, uint8_t const8 )
 {

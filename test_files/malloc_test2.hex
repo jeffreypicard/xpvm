@@ -5,9 +5,17 @@
 0000 0000             # annotations
 0000 0002             # 2 is executable 
 0000 0000             # unsigned frame size
-0000 0000             # unsigned contents length (won't be zero)
+0000 001c             # unsigned contents length (won't be zero)
 #
 # Code goes here!
+#
+0e11 0010             # ldimm r11 <-- $0010 (16) 
+0e12 0000             # ldimm r12 <-- $0000 
+0e20 0061             # ldimm r20 <-- $0061 (97) 
+0e21 0001             # ldimm r21 <-- $0001 
+6110 1112             # alloc_blk r10, r11, r12 (alloc 16 bytes, store blk in r10) 
+63ff 10ff             # release_blk r10 
+1020 1001             # stb b(r10) + r01 <-- r20 
 #
 0000 0000             # unsigned number of exception handlers
 0000 0000             # unsigned outsymbol references

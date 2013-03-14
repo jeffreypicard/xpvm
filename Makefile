@@ -2,8 +2,13 @@
 # Makefile for running xpvm
 #
 
-CC = gcc
-CFLAGS = -g -Wall -pthread
+CC := gcc
+
+BUILD := checks
+cflags.checks := -g -Wall -pthread -DCHECKS=1
+cflags.nchecks := -g -Wall -pthread -DCHECKS=0
+
+CFLAGS := ${cflags.${BUILD}}
 
 all: xpvm
 
@@ -49,3 +54,7 @@ test:
 	./xpvm test_files/addd_test.obj
 	./test_files/hex_to_obj ./test_files/opcode_tests.hex ./test_files/opcode_tests.obj
 	./xpvm test_files/opcode_tests.obj
+	./test_files/hex_to_obj ./test_files/malloc_tests.hex ./test_files/malloc_tests.obj
+	./xpvm test_files/malloc_tests.obj
+	./test_files/hex_to_obj ./test_files/malloc_test2.hex ./test_files/malloc_test2.obj
+	-./xpvm test_files/malloc_test2.obj

@@ -221,6 +221,8 @@ static void *fetch_execute(void *v)
   cmd_arg *ar1 = NULL, *ar2 = NULL;
   /* Inialize the VM to run */
   uint64_t reg[NUM_REGS];
+  reg[0] = 0;
+  reg[1] = 0;
   reg[BLOCK_REG] = (uint64_t) CAST_INT block_ptr;
   //test_block_macros( block_ptr[0] );
   stack_frame *stack = calloc( 1, sizeof(stack_frame) );
@@ -381,6 +383,9 @@ int main( int argc, char **argv )
 
   if( argc != 2 )
     EXIT_WITH_ERROR("Usage: xpvm one_object_file.obj\n");
+
+  regs[0] = 0;
+  regs[1] = 0;
 
   pthread_mutex_init( &malloc_xpvm_mu, NULL );
 

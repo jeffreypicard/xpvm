@@ -16,6 +16,7 @@
 char *native_funcs[] =
 {
   "print_int",
+  "print_string",
 };
 
 
@@ -23,6 +24,7 @@ int ldb_2( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(int8_t *)(b + reg[rk]);
   return 1;
 }
@@ -31,6 +33,7 @@ int ldb_3( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(int8_t *)(b + const8);
   return 1;
 }
@@ -39,6 +42,7 @@ int lds_4( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(int16_t *)(b + reg[rk]);
   return 1;
 }
@@ -47,6 +51,7 @@ int lds_5( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(int16_t *)(b + const8);
   return 1;
 }
@@ -55,6 +60,7 @@ int ldi_6( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(int32_t *)(b + const8);
   return 1;
 }
@@ -63,6 +69,7 @@ int ldi_7( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = (int64_t) *(int32_t *)(b + reg[rk]);
   return 1;
 }
@@ -71,6 +78,7 @@ int ldl_8( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(int64_t *)(b + reg[rk]);
 
   return 1;
@@ -80,6 +88,7 @@ int ldl_9( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(int64_t*)(b + const8);
 
   return 1;
@@ -89,6 +98,7 @@ int ldf_10( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(uint64_t*)(float*)(b + reg[rk]);
   return 1;
 }
@@ -97,6 +107,7 @@ int ldf_11( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(uint64_t*)(float*)(b + const8);
   return 1;
 }
@@ -105,6 +116,7 @@ int ldd_12( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(uint64_t*)(double*)(b + reg[rk]);
   //block *b = (block*) CAST_INT reg[rj];
   //reg[ri] = *(int64_t *)(b->data + const8);
@@ -115,6 +127,7 @@ int ldd_13( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
+  CHECK_READ_ANNOTS( proc_id, b );
   reg[ri] = *(uint64_t*)(double*)(b + const8);
   //block *b = (block*) CAST_INT reg[rj];
   //reg[ri] = *(int64_t *)(b->data + const8);
@@ -158,7 +171,7 @@ int stb_16( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( reg[rk] > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in stb_17!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(uint8_t *)(b + reg[rk]) = reg[ri];
   return 1;
 }
@@ -170,7 +183,7 @@ int stb_17( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( const8 > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in stb_17!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(uint8_t *)(b + const8) = reg[ri];
   return 1;
 }
@@ -182,7 +195,7 @@ int sts_18( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( reg[rk] > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in sts_18!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(int8_t *)(b + reg[rk]) = reg[ri];
   return 1;
 }
@@ -194,7 +207,7 @@ int sts_19( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( const8 > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in sts_18!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(int8_t *)(b + const8) = reg[ri];
   return 1;
 }
@@ -206,7 +219,7 @@ int sti_20( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( reg[rk] > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in sti_21!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(int32_t *)(b + reg[rk]) = reg[ri];
   return 1;
 }
@@ -218,7 +231,7 @@ int sti_21( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( const8 > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in sti_21!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(int32_t *)(b + const8) = reg[ri];
 
   return 1;
@@ -231,7 +244,7 @@ int stl_22( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( reg[rk] > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in stl_22!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(int64_t *)(b + reg[rk]) = reg[ri];
 
   return 1;
@@ -244,7 +257,7 @@ int stl_23( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( const8 > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in stl_23!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(int64_t *)(b + const8) = reg[ri];
 
   return 1;
@@ -257,7 +270,7 @@ int stf_24( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( reg[rk] > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in stf_24!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(uint32_t *)(b + reg[rk]) = *(uint32_t*) (float*) &reg[ri];
 
   return 1;
@@ -270,7 +283,7 @@ int stf_25( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( const8 > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in stf_25!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(uint32_t *)(b + const8) = *(uint32_t*) (float*) &reg[ri];
 
   return 1;
@@ -283,7 +296,7 @@ int std_26( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( reg[rk] > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in std_26!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(uint64_t *)(b + reg[rk]) = *(uint64_t*) (double*) &reg[ri];
 
   return 1;
@@ -296,7 +309,7 @@ int std_27( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   if( const8 > BLOCK_LENGTH( b ) )
     EXIT_WITH_ERROR("Error: Bad memory access in std_27!\n"
                     "This should actually throw an exception!\n");
-  /* FIXME: Check annots */
+  CHECK_WRITE_ANNOTS( proc_id, b );
   *(uint64_t *)(b + const8) = *(uint64_t*) (double*) &reg[ri];
 
   return 1;
@@ -461,7 +474,7 @@ int muld_45( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 
 #if DEBUG_XPVM
   fprintf( stderr, "m: %f\nn: %f\nr: %f\n",
-                   m, n, result );
+                   m, n, r );
 #endif
   reg[ri] = *(uint64_t*) &r;
 #if DEBUG_XPVM
@@ -813,20 +826,6 @@ int valid_bid( uint64_t id )
   return 1;
 }
 
-#define SET_BLOCK_OWNED( b ) do {                     \
-  BLOCK_ANNOTS( b ) = BLOCK_ANNOTS( b ) & OWNED_MASK; \
-} while(0)
-
-#define SET_BLOCK_CHAINED( b, id ) do {             \
-  BLOCK_ANNOTS(b) = BLOCK_ANNOTS(b) & CHAINED_MASK; \
-  if( ! valid_bid( id ) )                           \
-    EXIT_WITH_ERROR("Error: Invalid block ID!\b");  \
-  uint64_t p_id = id;                               \
-  while( BLOCK_CHAIN(p_id) )                        \
-    p_id = BLOCK_CHAIN(p_id);                       \
-  BLOCK_CHAIN(b) = p_id;                            \
-} while(0)
-
 int alloc_blk_96( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
@@ -836,7 +835,7 @@ int alloc_blk_96( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 
   b = (uint8_t*)malloc_xpvm( reg[rj] );
   BLOCK_OWNER( b ) = proc_id;
-  BLOCK_LENGTH( b ) = reg[ri];
+  BLOCK_LENGTH( b ) = reg[rj];
   if( ! reg[rk] )
     SET_BLOCK_OWNED( b );
   else
@@ -848,21 +847,50 @@ int alloc_blk_96( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   return 1;
 }
 
-int mmexa_97( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+int alloc_private_blk_97( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  uint8_t *b;
+
+  pthread_mutex_lock( &malloc_xpvm_mu );
+
+  b = (uint8_t*)malloc_xpvm( reg[rj] );
+
+  BLOCK_OWNER( b ) = proc_id;
+  BLOCK_LENGTH( b ) = reg[ri];
+  SET_BLOCK_OWNED( b );
+  SET_BLOCK_PRIVATE( b );
+  reg[ri] = (uint64_t)(uint64_t*) b;
+
+  pthread_mutex_unlock( &malloc_xpvm_mu );
+
   return 1;
 }
 
-int mmexa_98( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+int aquire_blk_98( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  uint32_t old_owner = 0;
+  uint8_t *b = (uint8_t*) reg[rj];
+  CHECK_AQUIRE_ANNOTS( proc_id, b );
+  SET_BLOCK_OWNED(b);
+  old_owner = BLOCK_OWNER(b);
+  if( old_owner )
+  {
+    //failed
+  }
+  CMPXCHG( BLOCK_OWNER(b), proc_id );
   return 1;
 }
 
-int atraits_99( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
+int release_blk_99( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
+            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  uint8_t *b = (uint8_t*) reg[rj];
+
+  CHECK_RELEASE_ANNOTS( proc_id, b );
+  BLOCK_OWNER(b) = 0;
+  SET_BLOCK_FREE(b);
   return 1;
 }
 
@@ -942,9 +970,7 @@ int call_114( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   fprintf( stderr, "\tcall: b: %p\n", b );
   fprintf( stderr, "INST_MASK: %lld\n", (uint64_t) INST_MASK );
 #endif
-  /*FIXME: Check annots for executable */
-  if( ! (CHECK_INST_ANNOT(b)) )
-    EXIT_WITH_ERROR("Error: block does not have the instruction annotation!\n");
+  CHECK_EXEC_ANNOTS( proc_id, b );
   stack_frame *f = calloc( 1, sizeof(stack_frame) );
   /* FIXME: Throw OutOfMemory Exception */
   if( !f )
