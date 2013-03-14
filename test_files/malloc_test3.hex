@@ -5,7 +5,7 @@
 0000 0000             # annotations
 0000 0002             # 2 is executable 
 0000 0000             # unsigned frame size
-0000 0020             # unsigned contents length (won't be zero)
+0000 0028             # unsigned contents length (won't be zero)
 #
 # Code goes here!
 #
@@ -13,9 +13,11 @@
 0e12 0000             # ldimm r12 <-- $0000 
 0e20 0061             # ldimm r20 <-- $0061 (97) 
 0e21 0001             # ldimm r21 <-- $0001 
-6110 1112             # alloc_blk r10, r11, r12 (alloc 16 bytes, store blk in r10) 
+6010 1112             # alloc_blk r10, r11, r12 (alloc 16 bytes, store blk in r10) 
 63ff 10ff             # release_blk r10 
+62ff 10ff             # aquire_blk r10 
 1020 1001             # stb b(r10) + r01 <-- r20 
+7321 10ff             # calln r21, r10 (print_string with char* in r10)
 74ff 01ff             # ret r01 
 #
 0000 0000             # unsigned number of exception handlers

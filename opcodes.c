@@ -834,12 +834,12 @@ int alloc_blk_96( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   pthread_mutex_lock( &malloc_xpvm_mu );
 
   b = (uint8_t*)malloc_xpvm( reg[rj] );
-  BLOCK_OWNER( b ) = proc_id;
   BLOCK_LENGTH( b ) = reg[rj];
   if( ! reg[rk] )
     SET_BLOCK_OWNED( b );
   else
     SET_BLOCK_CHAINED( b, reg[rk] );
+  BLOCK_OWNER( b ) = proc_id;
   reg[ri] = (uint64_t)(uint64_t*) b;
 
   pthread_mutex_unlock( &malloc_xpvm_mu );
@@ -856,10 +856,10 @@ int alloc_private_blk_97( unsigned int proc_id, uint64_t *reg, stack_frame **sta
 
   b = (uint8_t*)malloc_xpvm( reg[rj] );
 
-  BLOCK_OWNER( b ) = proc_id;
   BLOCK_LENGTH( b ) = reg[ri];
   SET_BLOCK_OWNED( b );
   SET_BLOCK_PRIVATE( b );
+  BLOCK_OWNER( b ) = proc_id;
   reg[ri] = (uint64_t)(uint64_t*) b;
 
   pthread_mutex_unlock( &malloc_xpvm_mu );
@@ -870,16 +870,16 @@ int alloc_private_blk_97( unsigned int proc_id, uint64_t *reg, stack_frame **sta
 int aquire_blk_98( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
-  uint32_t old_owner = 0;
   uint8_t *b = (uint8_t*) reg[rj];
   CHECK_AQUIRE_ANNOTS( proc_id, b );
-  SET_BLOCK_OWNED(b);
-  old_owner = BLOCK_OWNER(b);
-  if( old_owner )
+  if( CHECK_OWNED(b) )
   {
-    //failed
+    reg[rk] = 0;
+    return 1;
   }
-  CMPXCHG( BLOCK_OWNER(b), proc_id );
+  /* reg[rk] is set in this macro */
+  SET_BLOCK_OWNED(b);
+  CMPXCHG( &(BLOCK_OWNER(b)), NULL, proc_id );
   return 1;
 }
 
@@ -889,8 +889,8 @@ int release_blk_99( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   uint8_t *b = (uint8_t*) reg[rj];
 
   CHECK_RELEASE_ANNOTS( proc_id, b );
-  BLOCK_OWNER(b) = 0;
   SET_BLOCK_FREE(b);
+  BLOCK_OWNER(b) = 0;
   return 1;
 }
 

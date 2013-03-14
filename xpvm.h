@@ -98,6 +98,7 @@ int do_init_proc( uint64_t *proc_id, uint64_t work, int argc,
 int do_proc_join( uint64_t proc_id, uint64_t *ret_val );
 int do_join2( uint64_t proc_id, uint64_t *ret_val );
 
+
 /************************** Structs *********************************/
 
 /*
@@ -111,6 +112,8 @@ struct _stack_frame
   uint64_t      cib;
   uint64_t      reg255;
   uint64_t      ret_reg;
+  uint64_t      except_num;
+  uint64_t      payload;
   //unsigned char *locals;
   //block         *block;
   struct _stack_frame *prev;
@@ -144,6 +147,11 @@ struct _block
   uint8_t *aux_data;
   //struct _block *next;
 } typedef block;
+
+/******************** Other functions *******************************/
+
+int process_exception( unsigned int proc_id, uint64_t *reg, stack_frame **stack, 
+                       uint64_t except_num, uint64_t payload );
 
 /*
  * Macros to access the array implementation of the blocks.
@@ -179,10 +187,6 @@ struct _block
 #define PRIVATE_MASK      0x0000000000000010 
 #define VOLATILE_MASK     0x0000000000000020 
 
-#if CHECKS
-/*
- * Macros for checking annotations
- */
 #define CHECK_INST_ANNOT( b ) INST_MASK & BLOCK_ANNOTS( b )
 #define CHECK_EXEC( b ) INST_MASK & BLOCK_ANNOTS( b )
 #define CHECK_PRIVATE( b ) PRIVATE_MASK & BLOCK_ANNOTS( b )
@@ -192,6 +196,10 @@ struct _block
 #define CHECK_OWNED_VOLATILE(b) CHECK_OWNED(b) && CHECK_VOLATILE(b)
 #define CHECK_FREE_VOLATILE(b) CHECK_FREE(b) && CHECK_VOLATILE(b)
 
+#if CHECKS
+/*
+ * Macros for checking annotations
+ */
 #define CHECK_READ_ANNOTS( pid, b ) do {                        \
   if( CHECK_PRIVATE(b) && !(pid == BLOCK_OWNER(b)) )            \
     EXIT_WITH_ERROR("Error: proc %d attempted to read "         \
@@ -209,13 +217,9 @@ struct _block
 
 #define CHECK_WRITE_ANNOTS( pid, b ) do {                       \
   if( CHECK_PRIVATE(b) && !(pid == BLOCK_OWNER(b)) )            \
-    EXIT_WITH_ERROR("Error: proc %d attempted to write "        \
-                    "block %p illegally\n",                     \
-                    pid, b );                                   \
+    return process_exception( pid, reg, stack, 1, 1);           \
   if( CHECK_OWNED(b) && !(pid == BLOCK_OWNER(b)) )              \
-    EXIT_WITH_ERROR("Error: proc %d attempted to write "        \
-                    "block %p illegally\n",                     \
-                    pid, b );                                   \
+    return process_exception( pid, reg, stack, 1, 1);           \
   if( CHECK_FREE(b) )                                           \
     EXIT_WITH_ERROR("Error: proc %d attempted to write "        \
                     "block %p illegally\n",                     \
@@ -243,21 +247,37 @@ struct _block
                     b);                                         \
 }while(0)
 
+#define CHECK_AQUIRE_ANNOTS( pid, b ) do {                      \
+  if( ! valid_bid((u64)b) )                                     \
+    EXIT_WITH_ERROR("Error: %p is not a valid block\n",         \
+                    b);                                         \
+  if( CHECK_OWNED(b) && (pid == BLOCK_OWNER(b)) )               \
+    EXIT_WITH_ERROR("Error: proc %d already owns block %p\n",   \
+                    pid, b );                                   \
+  if( CHECK_PRIVATE (b) )                                       \
+    EXIT_WITH_ERROR("Error: proc %d attempted to access "       \
+                    "private block %p\n",                       \
+                    pid, b );                                   \
+} while(0)
+
 #else //CHECKS
 
-#define CHECK_INST_ANNOT( b ) {}
+/*#define CHECK_INST_ANNOT( b ) {}
 #define CHECK_PRIVATE( b ) {}
 #define CHECK_OWNED( b ) {}
 #define CHECK_FREE( b ) {}
 #define CHECK_VOLATILE( b ) {}
 #define CHECK_OWNED_VOLATILE(b) {}
-#define CHECK_FREE_VOLATILE(b) {}
+#define CHECK_FREE_VOLATILE(b) {}*/
 
 #define CHECK_READ_ANNOTS( pid, b ) {}
 #define CHECK_WRITE_ANNOTS( pid, b ) {}
 #define CHECK_EXEC_ANNOTS(pid, b) {}
+#define CHECK_RELEASE_ANNOTS(pid, b) {}
+#define CHECK_AQUIRE_ANNOTS(pid, b) {}
 
 #endif //CHECKS
+
 
 /*
  * Macros for setting annotations
@@ -288,6 +308,18 @@ struct _block
   BLOCK_CHAIN(b) = p_id;                            \
 } while(0)
 
+/*
+ * CMPXCHG
+ * Compare exchange macro for aquire block.
+ * FIXME: This needs to actually be made atomic with cmpxchg.
+ */
+int aquire_blk_asm( uint64_t*, uint32_t );
+#define CMPXCHG( own_ptr, nil, new_owner ) do {     \
+  if( aquire_blk_asm( own_ptr, new_owner ) )        \
+    reg[rk] = 1;                                    \
+  else                                              \
+    reg[rk] = 0;                                    \
+}while(0)
 
 /*
  * Struct to hold the arguments passed to doProcInit.
@@ -384,6 +416,7 @@ int btrue_82                  OPCODE_FUNC
 int bfalse_83                 OPCODE_FUNC
 int alloc_blk_96              OPCODE_FUNC
 int alloc_private_blk_97      OPCODE_FUNC
+int aquire_blk_98             OPCODE_FUNC
 int release_blk_99            OPCODE_FUNC
 int ldfunc_112                OPCODE_FUNC
 int call_114                  OPCODE_FUNC

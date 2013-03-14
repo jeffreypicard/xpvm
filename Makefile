@@ -3,6 +3,7 @@
 #
 
 CC := gcc
+AS := nasm -f elf64
 
 BUILD := checks
 cflags.checks := -g -Wall -pthread -DCHECKS=1
@@ -12,13 +13,13 @@ CFLAGS := ${cflags.${BUILD}}
 
 all: xpvm
 
-xpvm: xpvm.o obj_file.o opcodes.o allocator.o wrapped_c_lib.so
-	$(CC) $(CFLAGS) -rdynamic xpvm.o obj_file.o opcodes.o allocator.o -o xpvm -ldl
+xpvm: xpvm.o obj_file.o opcodes.o allocator.o wrapped_c_lib.so aquire_blk.o
+	$(CC) $(CFLAGS) -rdynamic xpvm.o obj_file.o opcodes.o allocator.o aquire_blk.o -o xpvm -ldl
 
 xpvm.o: xpvm.c xpvm.h opcodes.o
 	$(CC) $(CFLAGS) -c xpvm.c
 
-opcodes.o: opcodes.c xpvm.h
+opcodes.o: opcodes.c  xpvm.h
 	$(CC) $(CFLAGS) -c opcodes.c
 
 obj_file.o: obj_file.c xpvm.h
@@ -36,11 +37,13 @@ wrapped_c_lib.o: wrapped_c_lib.c
 # Assembly functions
 #print_int.o:	print_int.s
 #	$(CC) $(CFLAGS) -c $^
+aquire_blk.o: aquire_blk.asm
+	$(AS) $^
 
 .PHONY: clean test
 
 clean:
-	-rm -f xpvm xpvm.o obj_file.o opcodes.o allocator.o wrapped_c_lib.o wrapped_c_lib.so
+	-rm -f xpvm xpvm.o obj_file.o opcodes.o allocator.o wrapped_c_lib.o wrapped_c_lib.so aquire_blk.o
 
 test:
 	#./xpvm test_files/ret_42.obj
@@ -58,3 +61,5 @@ test:
 	./xpvm test_files/malloc_tests.obj
 	./test_files/hex_to_obj ./test_files/malloc_test2.hex ./test_files/malloc_test2.obj
 	-./xpvm test_files/malloc_test2.obj
+	./test_files/hex_to_obj ./test_files/malloc_test3.hex ./test_files/malloc_test3.obj
+	./xpvm test_files/malloc_test3.obj
