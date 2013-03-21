@@ -63,3 +63,5 @@ test:
 	-./xpvm test_files/malloc_test2.obj
 	./test_files/hex_to_obj ./test_files/malloc_test3.hex ./test_files/malloc_test3.obj
 	./xpvm test_files/malloc_test3.obj
+	./test_files/hex_to_obj ./test_files/malloc_test4.hex ./test_files/malloc_test4.obj
+	./xpvm test_files/malloc_test4.obj

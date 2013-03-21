@@ -100,29 +100,28 @@ int process_exception( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   while(1)
   {
     handlers = (uint32_t*) BLOCK_EXCEPT_HANDLERS( CIB );
-    if( !handlers )
-      goto next_stack;
-    
-    /* Search for exception handler */
-    num_handlers = *handlers;
-    handlers++;
-
-    for( i = 0; i < num_handlers; i++ )
+    if( handlers )
     {
-      start_offset  = *handlers++;
-      end_offset    = *handlers++;
-      code_offset   = *handlers++;
-      if( start_offset <= CIO && end_offset >= CIO )
+      /* Search for exception handler */
+      num_handlers = *handlers;
+      handlers++;
+
+      for( i = 0; i < num_handlers; i++ )
       {
-        /* CIB is current block, CIO is the offset specified by the handler */
-        CIO = code_offset;
-        (*stack)->except_num = except_num;
-        (*stack)->payload = payload;
-        return 1;
+        start_offset  = *handlers++;
+        end_offset    = *handlers++;
+        code_offset   = *handlers++;
+        if( start_offset <= CIO && end_offset >= CIO )
+        {
+          /* CIB is current block, CIO is the offset specified by the handler */
+          CIO = code_offset;
+          (*stack)->except_num = except_num;
+          (*stack)->payload = payload;
+          return 1;
+        }
       }
     }
     /* Pop current stack and look for exception handlers in the next. */
-  next_stack:
     reg[PC_REG] = (*stack)->pc;
     reg[255] = (*stack)->reg255;
     CIO = (*stack)->cio;

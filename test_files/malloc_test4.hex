@@ -1,0 +1,31 @@
+3130 3636             # magic number
+0000 0001             # unsigned block count
+6d61 696e             # Null terminated utf string block name, "main"
+00 
+0000 0000             # annotations
+0000 0002             # 2 is executable 
+0000 0000             # unsigned frame size
+0000 002c             # unsigned contents length (won't be zero)
+#
+# Code goes here!
+#
+0e11 0010             # ldimm r11 <-- $0010 (16) 
+0e12 0000             # ldimm r12 <-- $0000 
+0e20 0061             # ldimm r20 <-- $0061 (97) 
+0e21 0001             # ldimm r21 <-- $0001 
+6110 1112             # alloc_blk r10, r11, r12 (alloc 16 bytes, store blk in r10) 
+63ff 10ff             # release_blk r10 
+1020 1001             # stb b(r10) + r01 <-- r20 
+74ff 01ff             # ret r01 
+0e13 ffff             # ldimm r13 <-- $ffff (65536)
+3013 1300             # cvtld r11 <-- r11 
+74ff 13ff             # ret r01 
+#
+0000 0001             # unsigned number of exception handlers
+0000 0000 
+0000 001c  
+0000 0020 
+0000 0000             # unsigned outsymbol references
+0000 0000             # unsigned native function references
+0000 0000             # auxiliary data length
+
