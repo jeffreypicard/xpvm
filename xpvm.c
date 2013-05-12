@@ -17,11 +17,11 @@
 #include <dlfcn.h>
 #include <assert.h>
 
-/* 32-bit and 64-bit types */
-#include <stdint.h>
-
 #include "xpvm.h"
 #include "opcode_table.h"
+
+/* Number of bytes for the XPVM memory allocator */
+#define XPVM_MEM_SIZE 10000
 
 /* forward references */
 static void *fetch_execute(void *v);
@@ -128,7 +128,8 @@ int process_exception( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
     CIB = (*stack)->cib;
     /* popped last stack, halt and issue error. */
     if( !(*stack)->prev )
-      EXIT_WITH_ERROR("Unhandled Exception\n");
+      return 2;
+      //EXIT_WITH_ERROR("Error: Unhandled Exception\n");
     stack_frame *old_frame = *stack;
     *stack = (*stack)->prev;
     if( old_frame->block )
@@ -238,14 +239,14 @@ void test_block_macros( uint64_t ptr_as_int )
 #if DEBUG_XPVM
   uint8_t *b = (uint8_t *) CAST_INT ptr_as_int;
   fprintf( stderr, "Block Headers.\n"
-                   "owner:            %llx\n"
-                   "annots:           %llx\n"
+                   "owner:            %" PRIx64 "\n"
+                   "annots:           %" PRIx64 "\n"
                    "aux_length:       %x\n"
                    "out_sym_refs:     %x\n"
-                   "num_native_refs:  %x\n"
-                   "except_handlers:  %x\n"
+                   "num_native_refs:  %" PRIx64 "\n"
+                   "except_handlers:  %" PRIx64 "\n"
                    "frame_size:       %x\n"
-                   "length:           %x\n",
+                   "length:           %" PRIx32 "\n",
                    BLOCK_OWNER( b ),
                    BLOCK_ANNOTS( b ),
                    BLOCK_AUX_LENGTH( b ),
@@ -260,7 +261,7 @@ void test_block_macros( uint64_t ptr_as_int )
 /*
  * fetch_execute
  *
- * XPVM version of the fetch/execute function
+ * Get the next instruction and execute it.
  *
  */
 static void *fetch_execute(void *v)
@@ -339,7 +340,7 @@ static void *fetch_execute(void *v)
     for( i = 1; i <= argc && i < 11; i++ )
     {
 #if DEBUG_XPVM
-      fprintf( stderr, "arg %d: %lld\n", i, reg_bank[i] );
+      fprintf( stderr, "arg %d: %" PRIu64 "\n", i, reg_bank[i] );
 #endif
       reg[i] = reg_bank[i];
     }
@@ -355,13 +356,13 @@ static void *fetch_execute(void *v)
   /* fetch/execute cycle */
   while (1)
   {
-#if DEBUG_XPVM
+#if TRACK_EXEC
     fprintf( stderr, "------- start fetch/execute cycle -------\n");
 #endif
     /* check to see if the PC is in range
     if ((PC < 0) || (PC >= MAX_ADDRESS))
     {
-      return (void *) VM520_ADDRESS_OUT_OF_RANGE;
+      return (void *) XPVM_ADDRESS_OUT_OF_RANGE;
     }*/
 
     // fetch
@@ -372,7 +373,7 @@ static void *fetch_execute(void *v)
     uint8_t c2 = pc[1];
     uint8_t c3 = pc[2];
     uint8_t c4 = pc[3];
-#if DEBUG_XPVM
+#if TRACK_EXEC
     uint32_t word = assemble_inst( ((unsigned char*) CAST_INT CIB) + CIO );
     fprintf( stderr, "\tword: %08x\n", word );
 #endif
@@ -380,24 +381,24 @@ static void *fetch_execute(void *v)
     // update PC
     //PCX += 4;
     if( CIO + 4 > BLOCK_LENGTH( (uint8_t *) CAST_INT CIB ) )
-      EXIT_WITH_ERROR("Error: Intstructions over ran CIB in fetch_execute!\n");
+      EXIT_WITH_ERROR("Error: Instructions over ran CIB in fetch_execute!\n");
     CIO += 4;
 
     // execute
     //unsigned char opcode = word & 0xFF;
     //uint32_t opcode = (word & 0xFF000000) >> 24;
     uint32_t opcode = c1;
-#if DEBUG_XPVM
+#if TRACK_EXEC
     fprintf( stderr, "\topcode: %d\n", opcode );
 #endif
     if (opcode > MAX_OPCODE_XPVM) // illegal instruction
     {
-      return  (void *) VM520_ILLEGAL_INSTRUCTION;
+      return  (void *) XPVM_ILLEGAL_INSTRUCTION;
     }
 
     int32_t ret = opcodes[opcode].formatFunc(1, reg, &stack,
                                                  c1, c2, c3, c4 );
-#if DEBUG_XPVM
+#if TRACK_EXEC
     fprintf( stderr, "\tret: %d\n", ret );
 #endif
     if (ret <= 0)
@@ -425,7 +426,7 @@ static void *fetch_execute(void *v)
     else if (ret != 1)
       EXIT_WITH_ERROR("Error: Unexpected return value from formatFunc"
                       " in fetch_execute\n");
-#if DEBUG_XPVM
+#if TRACK_EXEC
     fprintf( stderr, "------- end fetch/execute cycle -------\n");
 #endif
   }
@@ -456,7 +457,7 @@ int main( int argc, char **argv )
 
   /* Initialize the allocator and the dynamic libraries */
   pthread_mutex_lock( &malloc_xpvm_mu );
-  malloc_xpvm_init( 10000 );
+  malloc_xpvm_init( XPVM_MEM_SIZE );
   load_c_lib();
   pthread_mutex_unlock( &malloc_xpvm_mu );
 
@@ -471,7 +472,7 @@ int main( int argc, char **argv )
   pthread_t *pt = (pthread_t*) CAST_INT ptr;
 
   /*do_proc_join( (uint64_t)(uint32_t)pt, &ret_val );*/
-  /* Since this is the main process we need to whole return struct
+  /* Since this is the main process we need to return the whole struct
    * not just the 64 bit thing that it returned as its return value */
   if (pthread_join(*pt, &ret) != 0)
   {
@@ -486,12 +487,6 @@ int main( int argc, char **argv )
   fprintf( stderr, "r->ret_val: %1.8lf\n", *(double*)&(r->ret_val) );
   /*fprintf( stderr, "r->ret_val: %lld\n", (uint64_t)r->ret_val );*/
   /*fprintf( stderr, "r->status: %d\n", (int)r->status );*/
-
-  if( 0 == strcmp( argv[1], "ret_42_malloc.obj" ) )
-  {
-    uint8_t *ret_b = (uint8_t*) CAST_INT r->ret_val;
-    fprintf( stderr, "%s\n", (char*) ret_b );
-  }
 
   /* FIXME: Double free when running with multiple processors */
   /*free( r );*/

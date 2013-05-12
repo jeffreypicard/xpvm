@@ -139,13 +139,13 @@ int ldimm_14( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 {
   uint16_t const16  = TWO_8_TO_16( c3, c4 );
 
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "ldimm_14: const16: %d\n", const16 );
 #endif
 
   reg[ri] = (uint64_t)const16;
 
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "ldimm_14: reg[ri]: %lld\n", reg[ri] );
 #endif
 
@@ -158,7 +158,7 @@ int ldimm2_15( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   uint16_t const16  = TWO_8_TO_16( c3, c4 );
   reg[ri] <<= 16;
   reg[ri] = reg[ri] | (uint64_t)const16;
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "ldimm_14: reg[ri]: %lld\n", reg[ri] );
 #endif
   return 1;
@@ -322,7 +322,7 @@ int ldblkid_28( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   /*FIXME: Check index against f_block count */
   uint8_t *b = (uint8_t*) CAST_INT 
                ((uint64_t*) CAST_INT reg[BLOCK_REG])[const16];
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "\tldblkid: b: %p\n", b );
 #endif
   reg[ri] = (uint64_t) CAST_INT b;
@@ -336,7 +336,7 @@ int ldnative_29( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   /*FIXME: Check index against f_block count */
   uint8_t *b = (uint8_t*) CAST_INT 
                ((uint64_t*) CAST_INT reg[BLOCK_REG])[const16];
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "\tldnative: b: %p\n", b );
 #endif
   reg[ri] = (uint64_t) CAST_INT b;
@@ -354,7 +354,7 @@ int addl_33( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
               uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   reg[ri] = (long)reg[rj] + (long)const8;
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "reg[ri]: %d\n", (int)reg[ri] );
 #endif
   return 1;
@@ -406,7 +406,7 @@ int reml_40( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
   reg[ri] = (long)reg[rj] % (long)reg[rk];
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "::\t%ld, %ld, %ld\n", reg[ri], (long)reg[rj], (long)reg[rk]);
 #endif
   return 1;
@@ -416,7 +416,7 @@ int reml_41( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   reg[ri] = (long)reg[rj] % (long)const8;
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "::\t%ld, %ld, %ld\n", reg[ri], (long)reg[rj], (long)const8);
 #endif
   return 1;
@@ -438,14 +438,14 @@ int addd_43( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   addend = *(double*) &reg[rk];
   sum = augend + addend;
 
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "augend: %f\naddend: %f\nsum: %f\n",
                    augend, addend, sum );
 #endif
 
   reg[ri] = *(uint64_t*) &sum;
 
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "reg[ri]: %f\n", *(double*) &reg[ri]);
 #endif
 
@@ -472,12 +472,12 @@ int muld_45( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   n = *(double*) &reg[rk];
   r = m * n;
 
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "m: %f\nn: %f\nr: %f\n",
                    m, n, r );
 #endif
   reg[ri] = *(uint64_t*) &r;
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "reg[ri]: %f\n", *(double*) &reg[ri] );
 #endif
 
@@ -496,13 +496,13 @@ int divd_46( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
     EXIT_WITH_ERROR("Divide by zero!!!!!!\n");
 
   quotient = dividend / divisor;
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "dividend: %f\ndivisor: %f\nquotient: %f\n",
                    dividend, divisor, quotient );
 #endif
 
   reg[ri] = *(uint64_t*) &quotient;
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "reg[ri]: %f\n", *(double*) &reg[ri] );
 #endif
 
@@ -524,7 +524,7 @@ int cvtld_48( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   double d;
   d = (double) reg[rj];
   reg[ri] =  *(uint64_t*)&d;
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "cvtld: reg[rj]: %d\n", reg[rj]);
   fprintf( stderr, "cvtld: reg[ri]: %f\n", *(double*)&reg[ri]);
 #endif
@@ -537,7 +537,7 @@ int cvtdl_49( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   long l;
   l = (long)*(double*)&reg[rj];
   reg[ri] = *(uint64_t*)&l;
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "cvtdl: reg[rj]: %f\n", *(double*)&reg[rj]);
   fprintf( stderr, "cvtdl: reg[ri]: %d\n", reg[ri]);
 #endif
@@ -949,7 +949,7 @@ int ldfunc_112( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   /*FIXME: Check index against f_block count */
   uint8_t *b = (uint8_t*) CAST_INT 
                ((uint64_t*) CAST_INT reg[BLOCK_REG])[const16];
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "\tldfunc: b: %p\n", b );
 #endif
   reg[ri] = (uint64_t) CAST_INT b;
@@ -966,7 +966,7 @@ int call_114( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "\tcall: b: %p\n", b );
   fprintf( stderr, "INST_MASK: %lld\n", (uint64_t) INST_MASK );
 #endif
@@ -982,7 +982,7 @@ int call_114( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   f->ret_reg = ri;
 
   uint32_t frame_size = BLOCK_FRAME_SIZE( b );
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "\tcall_114: frame_size: %d\n", frame_size );
 #endif
   if( frame_size )
@@ -1020,7 +1020,7 @@ int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   int i = 0;
   int (*fp)( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
                      uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "name: %s\n", name );
 #endif
 
@@ -1038,7 +1038,7 @@ int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 int ret_116( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t c2, uint8_t rj, uint8_t c4 )
 {
-#if DEBUG_XPVM > 1
+#if TRACK_EXEC > 1
   fprintf( stderr, "\treg: %p\n", reg );
   fprintf( stderr, "\tstack: %p\n", *stack );
 #endif
@@ -1048,7 +1048,7 @@ int ret_116( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   CIO = (*stack)->cio;
   CIB = (*stack)->cib;
   /* pop frame */
-#if DEBUG_XPVM
+#if TRACK_EXEC
   fprintf( stderr, "\tret_reg: %lld\n", (*stack)->ret_reg );
   fprintf( stderr, "\treg[ret_reg]: %lld\n", reg[(*stack)->ret_reg] );
 #endif

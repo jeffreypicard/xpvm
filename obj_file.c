@@ -68,7 +68,7 @@ int32_t load_object_file( char *filename, int32_t *errorNumber, uint32_t* block_
     EXIT_WITH_ERROR("Error: malloc failed in load_object_file");
 
 #if DEBUG_XPVM
-  fprintf(stderr, "block_cnt: %d\n", block_cnt );
+  fprintf(stderr, "block_cnt: %d\n", *block_cnt );
 #endif
 
   /* Read the blocks into memory */
@@ -128,7 +128,7 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
   READ_INT64_LITTLE_ENDIAN( annots, fp );
 
 #if DEBUG_XPVM
-  fprintf( stderr, "annots: %016llx\n", annots );
+  fprintf( stderr, "annots: %" PRIx64 "\n", annots );
 #endif
 
   /* Read frame size */
