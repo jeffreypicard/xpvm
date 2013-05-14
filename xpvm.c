@@ -44,6 +44,8 @@ uint64_t *block_ptr = 0;
  * This function is passed to atexit in the load_object_file
  * function. It cleans up all the memory used when loading the
  * object file.
+ * FIXME: This currently does not do a very good job at cleaning up
+ * all the memory. Is it really even needed?
  */
 void cleanup( void )
 {
@@ -465,7 +467,7 @@ int main( int argc, char **argv )
     EXIT_WITH_ERROR("Error: Invalid of corrupt object file.\n");
 
   if (!load_object_file(argv[1], &error_num, &block_cnt, &block_ptr))
-    EXIT_WITH_ERROR("load_object_file fails with error %d\n", error_num );
+    EXIT_WITH_ERROR("Error: load_object_file failed with error %d\n", error_num );
 
   do_init_proc( &ptr, 0, 0, NULL );
 

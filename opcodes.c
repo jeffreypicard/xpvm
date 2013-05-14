@@ -609,7 +609,6 @@ int rshiftu_55( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   r = x >> (const8 % 64);
   reg[ri] = r;
   return 1;
-  return 1;
 }
 
 int and_56( unsigned int proc_id, uint64_t *reg, stack_frame **stack,

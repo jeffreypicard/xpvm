@@ -1,0 +1,60 @@
+= Purpose =
+
+The purpose of this document is to give an overview and justification of the techniques used in this 
+implementation of the XPVM.
+
+= Startup =
+
+At startup the VM allocates memory used for the internal memory allocator and loads the dynamically
+linked C library. Currently there isn't much benefit to the dynamic loading since the list of dynamically 
+loaded functions is hard coded into XPVM. Ideally a configuration file would be read that would list all 
+the functions provided dynamically and that list created internally when the VM starts up. This would 
+actually allow for the native functions to be changed and the VM not need to be recompiled as was the 
+original intention of this approach.
+
+Next, the object file provided for execution is verified to ensure it is of the appropriate format and then
+loaded into an internal data structure.
+
+Finally a thread is created to act as the main processor for the program and the fetch/execute cycle begins.
+
+= Fetch / Execute Cycle =
+
+The fetch execute function is kept simple. It does a few initial setup operations such as allocating space for
+its registers on the stack, and copying over arguments passed to it. Then it goes into the cycle. 
+It reads a 32 bit word from the object file, which is the next instruction to execute, does some basic 
+verification of the opcode and then indexes into a predefined opcode table to get a function pointer for 
+the implementation of the opcode, which is calls.
+
+When it returns it checks to see if the return value of the opcode function indicates an error (so far the
+only case in which this happens in an uncaught exception) and then prints a message and exits. If there
+is no error it checks to see if the opcode just execute is the return opcode. If this is the case, it retrieves
+the return values from the appropriate register and calls a pthread_exit with that value in a struct so it
+may be retrieved by the main.
+
+If the user program creates a new processor, the arguments are copied out of the appropriate registers and then
+a new thread is created for the processor in the opcode that implements processor creation before returning
+back to the fetch execute cycle.
+
+= Exceptions =
+
+Each opcode is implemented with its own function. The function does whatever memory checking is needed and then
+performs its define operation. Exceptions are checked for via macros that take the block in question. When
+exception handling is turned off these macros are simply defined to do nothing. This removes the need to rely
+on compiler optimizations and we may be sure no instructions are executed at these points.
+
+If an exception arises, the appropriate information is passed to an exception handling function and its 
+return value is used as the return value from the opcode function. During the processing of the exception 
+the CIO and CIB registers are edited appropriately so that if a handler is found when control returns to 
+the fetch / execute function it can continue executing non the wiser.
+
+= Blocks =
+
+The entire memory system of the VM revolves around blocks. Both the memory that the instructions are read into
+and memory that the user program allocates during runtime are blocks. If a function needs space for local 
+variables when it is called, that space is allocated and represented as a block within the data structure for
+the stack frame.
+
+Blocks are implemented as an array of bytes (uint8_t *). Each block has a header located at a negative offset
+from the pointer which represents that block and its elements are accessed through macros. The actual data
+is then at positive offsets from the pointer, the length of which as well as its associated permissions are
+available in the header.
