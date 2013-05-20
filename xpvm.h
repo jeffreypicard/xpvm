@@ -26,6 +26,9 @@
 #define NUM_REGS      MAX_REGS + HIDDEN_REGS
 #define MAX_NAME_LEN  256
 
+/* Number of bytes for the XPVM memory allocator */
+#define XPVM_MEM_SIZE 10000
+
 //uint64_t CIO;
 //uint64_t CIB;
 

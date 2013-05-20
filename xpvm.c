@@ -20,9 +20,6 @@
 #include "xpvm.h"
 #include "opcode_table.h"
 
-/* Number of bytes for the XPVM memory allocator */
-#define XPVM_MEM_SIZE 10000
-
 /* forward references */
 static void *fetch_execute(void *v);
 void test_block_macros( uint64_t ptr_as_int );
