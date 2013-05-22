@@ -1019,13 +1019,28 @@ int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   int i = 0;
   int (*fp)( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
                      uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
+  /* int (*fp)( void ); */
 #if TRACK_EXEC
   fprintf( stderr, "name: %s\n", name );
+  fprintf( stderr, "num args: %d\n", const8 );
 #endif
 
   fp = dlsym( __lh, name );
   if( (error = dlerror()) != NULL )
     EXIT_WITH_ERROR("Error: dlsym failed in calln_115\n");
+
+  #if 0
+  for( i = 0; i < const8 && i < 10; i++ )
+  {
+    fprintf( stderr, "pushing arg\n");
+    __asm__("pushq %0\t\n"
+            : /* no output registers */
+            : "r" (reg[i]) /* input register read only */
+            : "%esp" /* Do I need to specify esp since I did a push? */
+            );
+  }
+  i = (*fp)();
+  #endif
 
   i = (*fp)( proc_id, reg, stack, opcode, ri, rj, const8 );
   if( !i )
