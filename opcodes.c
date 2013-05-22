@@ -17,6 +17,7 @@ char *native_funcs[] =
 {
   "print_int",
   "print_string",
+  "xpvm_printf",
 };
 
 
@@ -855,7 +856,7 @@ int alloc_private_blk_97( unsigned int proc_id, uint64_t *reg, stack_frame **sta
 
   b = (uint8_t*)malloc_xpvm( reg[rj] );
 
-  BLOCK_LENGTH( b ) = reg[ri];
+  BLOCK_LENGTH( b ) = reg[rj];
   SET_BLOCK_OWNED( b );
   SET_BLOCK_PRIVATE( b );
   BLOCK_OWNER( b ) = proc_id;
@@ -1014,35 +1015,91 @@ int call_114( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
-  char *name = native_funcs[reg[ri]];
+  char *name = native_funcs[reg[rj]];
   char *error = NULL;
   int i = 0;
-  int (*fp)( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-                     uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );
-  /* int (*fp)( void ); */
+  /*int (*fp)( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
+                     uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );*/
+  int (*fp)( void );
 #if TRACK_EXEC
   fprintf( stderr, "name: %s\n", name );
   fprintf( stderr, "num args: %d\n", const8 );
 #endif
 
-  fp = dlsym( __lh, name );
+  fp = (int (*)(void)) dlsym( __lh, name );
   if( (error = dlerror()) != NULL )
     EXIT_WITH_ERROR("Error: dlsym failed in calln_115\n");
 
-  #if 0
+  #if 1
   for( i = 0; i < const8 && i < 10; i++ )
   {
-    fprintf( stderr, "pushing arg\n");
-    __asm__("pushq %0\t\n"
-            : /* no output registers */
-            : "r" (reg[i]) /* input register read only */
-            : "%esp" /* Do I need to specify esp since I did a push? */
-            );
+    uint64_t to_push = reg[i+1];
+    switch( i )
+    {
+      case 0:
+        __asm__("movq %0, %%rdi\t\n"
+                : /* no output registers */
+                : "r" (to_push) /* input register read only */
+                : "%rdi" /* clobbered registers */
+                );
+      break;
+      case 1:
+        __asm__("movq %0, %%rsi\t\n"
+                :
+                : "r" (to_push) 
+                : "%rsi"
+                );
+      break;
+      case 2:
+        __asm__("movq %0, %%rdx\t\n"
+                :
+                : "r" (to_push) 
+                : "%rdx"
+                );
+      break;
+      case 3:
+        __asm__("movq %0, %%rcx\t\n"
+                : 
+                : "r" (to_push)
+                : "%rcx"
+                );
+      break;
+      case 4:
+        __asm__("movq %0, %%r8\t\n"
+                : 
+                : "r" (to_push) 
+                : "%r8"
+                );
+      break;
+      case 5:
+        __asm__("movq %0, %%r9\t\n"
+                : 
+                : "r" (to_push)
+                : "%r9"
+                );
+      break;
+      default:
+        __asm__("pushq %0\t\n"
+                : /* no output registers */
+                : "r" (to_push) /* input register read only */
+                : "%rsp" /* Do I need to specify rsp since I did a push? */
+                );
+      break;
+    }
   }
   i = (*fp)();
-  #endif
-
+  for( i = 0; i < const8 && i < 10; i++ )
+  {
+    __asm__("popq %%rax\t\n"
+            : /* no output registers */
+            : /* no input registers */
+            : "%rax" /* Do I need to specify esp since I did a push? */
+            );
+  }
+  #else
   i = (*fp)( proc_id, reg, stack, opcode, ri, rj, const8 );
+  #endif
+  reg[ri] = i;
   if( !i )
     return 0;
 

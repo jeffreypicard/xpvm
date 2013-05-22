@@ -5,19 +5,23 @@
 0000 0000             # annotations
 0000 0002             # 2 is executable 
 0000 0000             # unsigned frame size
-0000 0024             # unsigned contents length (won't be zero)
+0000 0034             # unsigned contents length (won't be zero)
 #
 # Code goes here!
 #
 0e11 0010             # ldimm r11 <-- $0010 (16) 
 0e12 0000             # ldimm r12 <-- $0000 
-0e20 0061             # ldimm r20 <-- $0061 (97) 
-0e21 0001             # ldimm r21 <-- $0001 
-6110 1112             # alloc_blk r10, r11, r12 (alloc 16 bytes, store blk in r10) 
-1020 1001             # stb b(r10) + r01 <-- r20 
-7321 10ff             # calln r21, r10 (print_string with char* in r10)
+0e21 0002             # ldimm r21 <-- $0002 
+6101 1112             # alloc_blk r01, r11, r12 (alloc 16 bytes, store blk in r10) 
+0e20 0034             # ldimm r20 <-- $0034 ("4") 
+1120 0100             # stb b(r01) + 00 <-- r20 
+0e20 0032             # ldimm r20 <-- $0032 ("2") 
+1120 0101             # stb b(r01) + 00 <-- r20 
+0e20 000a             # ldimm r20 <-- $000a ("\n")
+1120 0102             # stb b(r01) + 00 <-- r20 
+7311 2101             # calln r11, r21, 01 (print_string with char* in r01, and 1 arg)
 3011 1100             # cvtld r11 <-- r11 
-74ff 11ff             # ret r01 
+74ff 11ff             # ret r11 
 #
 0000 0000             # unsigned number of exception handlers
 0000 0000             # unsigned outsymbol references
