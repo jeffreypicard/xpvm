@@ -62,13 +62,12 @@ If an exception arises during the execution of an XPVM opcode, the appropriate
 information is passed to an exception handling function and its return value is
 used as the return value from the opcode function. During the processing of the
 exception the CIO and CIB registers are edited appropriately so that if a
-handler is found when control returns to the fetch / execute function it can
-continue executing non the wiser.
+handler is found, when control returns to the fetch / execute function it can
+continue executing without needing to handle any special cases.
 
 Currently exceptions in native code cause the VM to print an error message and
-shut down. The correct intended behavior would be to throw a low level
-exception which could get back to the VM and be translated in an XPVM
-exception.
+shut down. The intended behavior would be to throw a low level exception which
+could get back to the VM and be translated in an XPVM exception.
 
 = Blocks =
 
