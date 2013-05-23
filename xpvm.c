@@ -24,13 +24,6 @@
 static void *fetch_execute(void *v);
 void test_block_macros( uint64_t ptr_as_int );
 
-/* linked list to keep track of (symbol,address) pairs for insymbols
-static struct insymbol {
-  char *symbol;
-  unsigned int addr;
-  struct insymbol *next;
-} *insymbols = NULL;*/
-
 uint64_t regs[NUM_REGS];
 uint32_t block_cnt = 0;
 uint64_t *block_ptr = 0;
@@ -65,17 +58,115 @@ void cleanup( void )
   dlclose( __lh );
 }
 
+int add_blk( blk_list **root, uint64_t id )
+{
+  blk_list *new = calloc( 1, sizeof(blk_list) );
+  if( !new )
+    return 1;
+  new->id = id;
+  new->next = *root;
+  *root = new;
+  return 0;
+}
+
+int find_blk( blk_list *root, uint64_t id )
+{
+  blk_list *walk = root;
+  while( walk )
+  {
+    if( id == walk->id )
+      return 1;
+    walk = walk->next;
+  }
+  return 0;
+}
+
+uint8_t *blk_2_ptr( uint8_t *b, int offset, uint64_t checks )
+{
+#if CHECKS
+  unsigned int pid = pthread_self();
+  if( offset > BLOCK_LENGTH(b) )
+    EXIT_WITH_ERROR("Error: Out of bounds in blk_2_ptr. "
+                    "This should be an exception!\n");
+  if( checks & CHECK_READ )
+    CHECK_READ_ANNOTS_NATIVE( pid, b );
+  if( checks & CHECK_WRITE )
+    CHECK_WRITE_ANNOTS_NATIVE( pid, b );
+  return b + offset;
+#else
+  return b + offset;
+#endif
+}
+
 /*
- * load_c_lib
+ * load_native_funcs
  * 
- * This function loads the avilable C library functions
+ * This function loads the available native functions
  * from a dynamic library when the XPVM starts up.
  */
-int load_c_lib( void )
+int load_native_funcs( void )
 {
-  __lh = dlopen( C_LIB_PATH, RTLD_NOW ); 
+  /* The C standard says allow 63 characters for internal names
+   * and 31 for external.*/
+  const int max_name_len = 256;
+  char *error = NULL;
+  char name[max_name_len];
+  char c;
+  int i, j;
+  FILE *fp = fopen( NATIVE_FUNC_CFG_PATH, "r");
+  /* Count number of functions */
+  i = 0;
+  fread( (void *) &c, 1, 1, fp );
+  while( !feof( fp ) )
+  {
+    while( c != '\n' )
+    {
+      fread( (void *) &c, 1, 1, fp );
+    }
+    i++;
+    fread( (void *) &c, 1, 1, fp );
+  }
+  /* Allocate the native function table. */
+  num_native_funcs = i;
+  native_funcs = calloc( i, sizeof(native_func_table) );
+  if( !native_funcs )
+    EXIT_WITH_ERROR("Error: malloc failed in load_native_funcs.\n");
+  /* Read in the function names */
+  rewind( fp );
+  fread( (void *) &c, 1, 1, fp );
+  i = 0;
+  while( !feof( fp ) )
+  {
+    j = 0;
+    memset( (void *) name, 0, max_name_len );
+    while( c != '\n' )
+    {
+      name[j++] = c;
+      fread( (void *) &c, 1, 1, fp );
+      if( max_name_len == j )
+        EXIT_WITH_ERROR("Error: The max function name length for native "
+                        "functions is %d\n", max_name_len );
+    }
+    native_funcs[i].name = calloc( strlen(name) + 1, sizeof(char) );
+    if( !native_funcs[i].name )
+      EXIT_WITH_ERROR("Error: malloc failed in load_native_funcs.\n");
+    strncpy( native_funcs[i].name, name, strlen(name) );
+    i++;
+    if( j == 0 )
+      EXIT_WITH_ERROR("Error: Cannot have an empty native function name!\n");
+    fread( (void *) &c, 1, 1, fp );
+  }
+  __lh = dlopen( NATIVE_FUNC_LIB_PATH, RTLD_NOW ); 
   if( !__lh )
-    EXIT_WITH_ERROR("Error: in load_c_libs, %s\n", dlerror() );
+    EXIT_WITH_ERROR("Error: in load_native_funcs, %s\n", dlerror() );
+  
+  for( i = 0; i < num_native_funcs; i++ )
+  {
+    native_funcs[i].fp = (int (*)(void)) dlsym( __lh, native_funcs[i].name );
+    if( (error = dlerror()) != NULL )
+      EXIT_WITH_ERROR("Error: dlsym failed in load_native_funcs\n");
+  }
+
 
   /* Clear any previous errors */
   dlerror();
@@ -273,6 +364,7 @@ static void *fetch_execute(void *v)
   uint64_t *reg_bank = args->reg_bank;
   int argc = args->argc;
   uint64_t work = args->work;
+  unsigned int pid = pthread_self();
 
   free( args );
 
@@ -358,15 +450,8 @@ static void *fetch_execute(void *v)
 #if TRACK_EXEC
     fprintf( stderr, "------- start fetch/execute cycle -------\n");
 #endif
-    /* check to see if the PC is in range
-    if ((PC < 0) || (PC >= MAX_ADDRESS))
-    {
-      return (void *) XPVM_ADDRESS_OUT_OF_RANGE;
-    }*/
 
     // fetch
-    //int word = memory[PC];
-    //uint8_t *pc = (unsigned char*) CAST_INT PCX;
     uint8_t *pc = ((uint8_t *) CAST_INT CIB) + CIO;
     uint8_t c1 = pc[0];
     uint8_t c2 = pc[1];
@@ -378,14 +463,11 @@ static void *fetch_execute(void *v)
 #endif
 
     // update PC
-    //PCX += 4;
     if( CIO + 4 > BLOCK_LENGTH( (uint8_t *) CAST_INT CIB ) )
       EXIT_WITH_ERROR("Error: Instructions over ran CIB in fetch_execute!\n");
     CIO += 4;
 
     // execute
-    //unsigned char opcode = word & 0xFF;
-    //uint32_t opcode = (word & 0xFF000000) >> 24;
     uint32_t opcode = c1;
 #if TRACK_EXEC
     fprintf( stderr, "\topcode: %d\n", opcode );
@@ -395,7 +477,7 @@ static void *fetch_execute(void *v)
       return  (void *) XPVM_ILLEGAL_INSTRUCTION;
     }
 
-    int32_t ret = opcodes[opcode].formatFunc(1, reg, &stack,
+    int32_t ret = opcodes[opcode].formatFunc(pid, reg, &stack,
                                                  c1, c2, c3, c4 );
 #if TRACK_EXEC
     fprintf( stderr, "\tret: %d\n", ret );
@@ -445,6 +527,7 @@ int main( int argc, char **argv )
   ret_struct *r = NULL;
   /*uint64_t ret_val = 0;*/
   void *ret = NULL;
+  int i;
 
   if( argc != 2 )
     EXIT_WITH_ERROR("Usage: xpvm one_object_file.obj\n");
@@ -457,7 +540,7 @@ int main( int argc, char **argv )
   /* Initialize the allocator and the dynamic libraries */
   pthread_mutex_lock( &malloc_xpvm_mu );
   malloc_xpvm_init( XPVM_MEM_SIZE );
-  load_c_lib();
+  load_native_funcs();
   pthread_mutex_unlock( &malloc_xpvm_mu );
 
   if( verify_obj_format( argv[1], &obj_len ) != 0 )
@@ -465,6 +548,11 @@ int main( int argc, char **argv )
 
   if (!load_object_file(argv[1], &error_num, &block_cnt, &block_ptr))
     EXIT_WITH_ERROR("Error: load_object_file failed with error %d\n", error_num );
+
+  /* Add initial blocks to the global block list */
+  blocks = NULL;
+  for( i = 0; i < block_cnt; i++ )
+    add_blk( &blocks, block_ptr[i] );
 
   do_init_proc( &ptr, 0, 0, NULL );
 

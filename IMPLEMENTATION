@@ -51,14 +51,24 @@ handling is turned off these macros are simply defined to do nothing. This
 removes the need to rely on compiler optimizations and we may be sure no
 instructions are executed at these points.
 
+The opcodes are called internally through a table which has the opcode name, a
+number indicating which format the opcode uses and the function pointer to the
+implementation of the opcode.  All opcode functions have the same signature.
+Currently the format field is not used in this implementation of the XPVM.
+
 = Exceptions =
 
-If an exception arises, the appropriate information is passed to an exception
-handling function and its return value is used as the return value from the
-opcode function. During the processing of the exception the CIO and CIB
-registers are edited appropriately so that if a handler is found when control
-returns to the fetch / execute function it can continue executing non the
-wiser.
+If an exception arises during the execution of an XPVM opcode, the appropriate
+information is passed to an exception handling function and its return value is
+used as the return value from the opcode function. During the processing of the
+exception the CIO and CIB registers are edited appropriately so that if a
+handler is found when control returns to the fetch / execute function it can
+continue executing non the wiser.
+
+Currently exceptions in native code cause the VM to print an error message and
+shut down. The correct intended behavior would be to throw a low level
+exception which could get back to the VM and be translated in an XPVM
+exception.
 
 = Blocks =
 
@@ -87,8 +97,9 @@ employs the null garbage collector
 = Native Functions =
 
 In order to call native functions from XPVM we use dynamic libraries. The user
-writes his native code in C in the wrapped_c_lib.c file, then specifies the
-name of the function(s) in the file <file name>. These functions are then
+writes his native code in C in the file native_funcs.c, then specifies the name
+of the function(s) in the file native_funcs.cfg. This file lists the dynamic
+functions one per line with no additional white space. These functions are then
 dynamically loaded when the VM starts up and are put into a table.
 
 Since we are still only operating at the object file level, the VM makes the
@@ -99,10 +110,20 @@ for the XPVM.
 
 When a native function is called, inline assembly is used to store the first 6
 arguments into appropriate registers and push the rest onto the stack as is the
-x86_64 calling convention. N.B. all arguments are assumed to be 64 bits so the
+x86_64 calling convention. N.B. All arguments are assumed to be 64 bits so the
 user's native function declaration must reflect this. The pointer to the native
 function is then called with no arguments and results in control being passed
 to the native function with all the arguments available to it.
+
+A function called blk_2_ptr is provided in order to allow programmers access to
+the VM's memory checking capabilities. The function takes a block id, and
+offset and a bitwise OR of intended memory accesses (read and/or write). If
+checking is turned on in the VM, if will bounds check the access, check that
+the process as appropriate permission and return a pointer to that byte in
+memory if all is well.  Should any of the checks fail, currently the VM shuts
+down and prints and error message. What it should do, but is not implemented
+yet, is throw a lower level exception to get back to the calln opcode function
+in the VM so that it can throw an XPVM level exception.
 
 Implementing native functions in this way has several benefits. The API for the
 user is clear, they simply need to write a C function and tell the VM about it.
@@ -110,4 +131,19 @@ Through the use of dynamic libraries the VM does not need to be recompiled
 whenever a native function is changed or added.  Lastly, the in between step of
 building the stack for the native function and calling it with the arguments
 already in place has the security benefit of not revealing to a function the VM
-has no control over any of its internal data structures.
+has no control over, any of its internal data structures.
+
+= Concurrency =
+
+In order to support concurrency all change of block ownership instructions
+employ a thin lock via the Intel cmpxchg instruction. This is more efficient
+than a full blown mutex and provides the needed protection against race
+conditions when contending for ownership of a block. The allocator supports
+concurrency via pthread mutexs.
+
+An issue that is still outstanding however is the question of whether or not
+writes will be seen immediately when a block is switched from owned to free or
+when writing to a volatile block. The intended semantics is that whenever a
+legal read is done on a block, the processor will see the most up to date
+version of the data.  Currently nothing is being done in terms of hardware
+caches to guarantee the correctness of this.

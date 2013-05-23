@@ -13,7 +13,7 @@ CFLAGS := ${cflags.${BUILD}}
 
 all: xpvm
 
-xpvm: xpvm.o obj_file.o opcodes.o allocator.o wrapped_c_lib.so aquire_blk.o
+xpvm: xpvm.o obj_file.o opcodes.o allocator.o native_funcs.so aquire_blk.o
 	$(CC) $(CFLAGS) -rdynamic xpvm.o obj_file.o opcodes.o allocator.o aquire_blk.o -o xpvm -ldl
 
 xpvm.o: xpvm.c xpvm.h opcodes.o
@@ -28,11 +28,11 @@ obj_file.o: obj_file.c xpvm.h
 allocator.o: allocator.c xpvm.h
 	$(CC) $(CFLAGS) -c allocator.c
 
-wrapped_c_lib.so: wrapped_c_lib.o
-	$(CC) -fPIC -shared -o wrapped_c_lib.so wrapped_c_lib.o
+native_funcs.so: native_funcs.o
+	$(CC) -fPIC -shared -o native_funcs.so native_funcs.o
 
-wrapped_c_lib.o: wrapped_c_lib.c
-	$(CC) $(CFLAGS) -fPIC -shared -c wrapped_c_lib.c
+native_funcs.o: native_funcs.c
+	$(CC) $(CFLAGS) -fPIC -shared -c native_funcs.c
 
 # Assembly functions
 #print_int.o:	print_int.s
@@ -43,7 +43,7 @@ aquire_blk.o: aquire_blk.asm
 .PHONY: clean test
 
 clean:
-	-rm -f xpvm xpvm.o obj_file.o opcodes.o allocator.o wrapped_c_lib.o wrapped_c_lib.so aquire_blk.o
+	-rm -f xpvm xpvm.o obj_file.o opcodes.o allocator.o native_funcs.o native_funcs.so aquire_blk.o
 
 test:
 	#./xpvm test_files/ret_42.obj

@@ -90,11 +90,6 @@
     fprintf( stderr, __VA_ARGS__ );     \
 } while(0)
 
-/* Definition for block types */
-//#define FUNCTION_BLOCK 1
-//#define DATA_BLOCK 2
-//#define STACK_FRAME_BLOCK 3
-
 // maximum number of processors
 #define XPVM_MAX_PROCESSORS 16
 
@@ -130,7 +125,6 @@ int do_join2( uint64_t proc_id, uint64_t *ret_val );
 /*
  * Struct for a stack frame in the VM.
  */
-typedef struct _block block;
 struct _stack_frame
 {
   uint64_t      pc;
@@ -140,39 +134,28 @@ struct _stack_frame
   uint64_t      ret_reg;
   uint64_t      except_num;
   uint64_t      payload;
-  //unsigned char *locals;
-  //block         *block;
   struct _stack_frame *prev;
   uint8_t     *block;
 } typedef stack_frame;
 
-/*
- * Struct for the VM stack.
- */
-/*
-struct _stackNode
-{
-  stack_frame        *data;
-  struct _stackNode *prev;
-} typedef stackNode;*/
+uint32_t num_native_funcs;
 
-/*
- * Struct for the blocks read into memory from the object file.
- */
-struct _block
-{
-  uint32_t      length;
-  uint32_t      frame_size;
-  uint32_t      num_except_handlers;
-  uint32_t      num_outsymbol_refs;
-  uint32_t      length_aux_data;
-  uint64_t      annots;
-  uint64_t      owner;
-  //char          name[256];
-  uint8_t *data;
-  uint8_t *aux_data;
-  //struct _block *next;
-} typedef block;
+struct native_func_table {
+  int (*fp)(void);
+  char *name;
+} typedef native_func_table;
+
+native_func_table *native_funcs;
+
+struct blk_list {
+  uint64_t id;
+  struct blk_list *next;
+} typedef blk_list;
+
+blk_list *blocks;
+
+int add_blk( blk_list **, uint64_t );
+int find_blk( blk_list *, uint64_t );
 
 /******************** Other functions *******************************/
 
@@ -212,6 +195,12 @@ int process_exception( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 #define OWNED_MASK        0x0000000000000008
 #define PRIVATE_MASK      0x0000000000000010 
 #define VOLATILE_MASK     0x0000000000000020 
+
+/*
+ * Macros for native function API memory checking
+ */
+#define CHECK_READ        0x0000000000000001
+#define CHECK_WRITE       0x0000000000000002
 
 #define CHECK_INST_ANNOT( b ) INST_MASK & BLOCK_ANNOTS( b )
 #define CHECK_EXEC( b ) INST_MASK & BLOCK_ANNOTS( b )
@@ -268,6 +257,44 @@ int process_exception( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   }                                                             \
 }while(0)
 
+#define CHECK_READ_ANNOTS_NATIVE( pid, b ) do {                 \
+  if( CHECK_PRIVATE(b) && !(pid == BLOCK_OWNER(b)) ) {          \
+    EXIT_WITH_ERROR("Error: proc %d attempted to read "             \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  }                                                             \
+  if( CHECK_OWNED(b) && !(pid == BLOCK_OWNER(b)) ) {            \
+    EXIT_WITH_ERROR("Error: proc %d attempted to read "             \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  }                                                             \
+  if( CHECK_FREE(b) && !(CHECK_VOLATILE(b)) ) {                 \
+    EXIT_WITH_ERROR("Error: proc %d attempted to read "             \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  }                                                             \
+}while(0)
+
+#define CHECK_WRITE_ANNOTS_NATIVE( pid, b ) do {                \
+  if( CHECK_PRIVATE(b) && !(pid == BLOCK_OWNER(b)) ) {          \
+    EXIT_WITH_ERROR("Error: proc %d attempted to write "            \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  }                                                             \
+  if( CHECK_OWNED(b) && !(pid == BLOCK_OWNER(b)) ) {            \
+    EXIT_WITH_ERROR("Error: proc %d attempted to write "            \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  }                                                             \
+  if( CHECK_FREE(b) ) {                                         \
+    EXIT_WITH_ERROR("Error: proc %d attempted to write "            \
+                    "block %p illegally\n",                     \
+                    pid, b );                                   \
+  }                                                             \
+}while(0)
+
+
+
 #define CHECK_EXEC_ANNOTS(pid, b) do {                          \
   if( !(CHECK_EXEC(b)) ) {                                      \
     DEBUG_PRINT("Error: proc %d attempted to execute "          \
@@ -316,6 +343,7 @@ int process_exception( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   }                                                             \
 } while(0)
 
+
 #else //CHECKS
 
 /*#define CHECK_INST_ANNOT( b ) {}
@@ -334,6 +362,7 @@ int process_exception( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 
 #endif //CHECKS
 
+uint8_t *blk_2_ptr( uint8_t *b, int offset, uint64_t checks );
 
 /*
  * Macros for setting annotations
@@ -415,8 +444,10 @@ uint64_t malloc_xpvm( uint32_t );
 /*
  * Dynamic link handle.
  */
-#define C_LIB_PATH "./wrapped_c_lib.so"
+#define NATIVE_FUNC_LIB_PATH "./native_funcs.so"
 void *__lh;
+
+#define NATIVE_FUNC_CFG_PATH "./native_funcs.cfg"
 
 /********************** Opcode Declarations **************************/
 

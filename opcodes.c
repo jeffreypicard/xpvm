@@ -13,14 +13,6 @@
 
 #include "xpvm.h"
 
-char *native_funcs[] =
-{
-  "print_int",
-  "print_string",
-  "xpvm_printf",
-};
-
-
 int ldb_2( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
@@ -823,7 +815,7 @@ int bfalse_83( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
  */
 int valid_bid( uint64_t id )
 {
-  return 1;
+  return find_blk( blocks, id );
 }
 
 int alloc_blk_96( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
@@ -1006,17 +998,16 @@ int call_114( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   return 1;
 }
 
-/* FIXME:
- * This is wrong. The user first needs to load the native function into
- * a register then pass the actual function pointer to this opcode
- * and then it is called.
- * FIXME:
+/*
+ * calln_115
+ *
+ * calls a native function by index.
  */
 int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
-  char *name = native_funcs[reg[rj]];
-  char *error = NULL;
+  //char *name = native_funcs[reg[rj]].name;
+  //char *error = NULL;
   int i = 0;
   /*int (*fp)( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
                      uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );*/
@@ -1026,10 +1017,10 @@ int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   fprintf( stderr, "num args: %d\n", const8 );
 #endif
 
-  fp = (int (*)(void)) dlsym( __lh, name );
+  /*fp = (int (*)(void)) dlsym( __lh, name );
   if( (error = dlerror()) != NULL )
-    EXIT_WITH_ERROR("Error: dlsym failed in calln_115\n");
-
+    EXIT_WITH_ERROR("Error: dlsym failed in calln_115\n");*/
+  fp = native_funcs[reg[rj]].fp;
   #if 1
   for( i = 0; i < const8 && i < 10; i++ )
   {
@@ -1093,7 +1084,7 @@ int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
     __asm__("popq %%rax\t\n"
             : /* no output registers */
             : /* no input registers */
-            : "%rax" /* Do I need to specify esp since I did a push? */
+            : "%rax" /* Do I need to specify rsp since I did a pop? */
             );
   }
   #else
@@ -1179,5 +1170,5 @@ int join2_146( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 int whoami_147( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 )
 {
-  return 1;
+  return proc_id;
 }
