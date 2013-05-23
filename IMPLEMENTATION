@@ -90,8 +90,16 @@ it allocates at VM startup. It then hands out blocks of memory, rounded to 4
 bytes, as it is requested by programs through the XPVM memory allocation
 instruction. If the amount of memory requested by the program through an
 allocation instruction exceeds the amount of memory left in the allocator's
-pool, it will through an OUT_OF_MEMORY exception. The XPVM's memory allocator
-employs the null garbage collector
+pool, it should throw an OUT_OF_MEMORY exception, although currently it just
+prints a message and shuts down. The XPVM's memory allocator employs the null
+garbage collector.
+
+There is a native interface to the allocator via the malloc_xpvm_native
+function. This function provides the same capabilities as those available to
+the VM itself. It also currently prints an error message and shuts down the VM
+if it fails to allocate the requested memeory, however it should throw a low
+level exception which gets back to the VM and is translated in an OUT_OF_MEMORY
+exception.
 
 = Native Functions =
 

@@ -44,5 +44,14 @@ uint64_t malloc_xpvm( uint32_t bytes )
 
   next_block = new_next_block;
 
+  add_blk( &blocks, (uint64_t) CAST_INT b );
+
   return (uint64_t) CAST_INT b;
+}
+
+uint64_t malloc_xpvm_native( uint32_t bytes )
+{
+  pthread_mutex_lock( &malloc_xpvm_mu );
+  return malloc_xpvm( bytes );
+  pthread_mutex_unlock( &malloc_xpvm_mu );
 }

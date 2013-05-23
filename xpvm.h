@@ -119,6 +119,7 @@ int do_init_proc( uint64_t *proc_id, uint64_t work, int argc,
 int do_proc_join( uint64_t proc_id, uint64_t *ret_val );
 int do_join2( uint64_t proc_id, uint64_t *ret_val );
 
+uint64_t malloc_xpvm_native( uint32_t bytes );
 
 /************************** Structs *********************************/
 

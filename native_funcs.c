@@ -29,6 +29,7 @@ int xpvm_printf( const char *format, ... )
 {
   uint8_t *ptr = blk_2_ptr( (uint8_t *) format, 0, CHECK_WRITE | CHECK_READ );
   printf("%c\n", *ptr );
+  //uint64_t bid = malloc_xpvm_native( 10 );
   va_list ap;
   int i;
   va_start( ap, format );
