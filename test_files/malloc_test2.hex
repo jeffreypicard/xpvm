@@ -16,7 +16,7 @@
 6110 1112             # alloc_blk r10, r11, r12 (alloc 16 bytes, store blk in r10) 
 63ff 10ff             # release_blk r10 
 1020 1001             # stb b(r10) + r01 <-- r20 
-74ff 01ff             # ret r01 
+7401 ffff             # ret r01 
 #
 0000 0000             # unsigned number of exception handlers
 0000 0000             # unsigned outsymbol references

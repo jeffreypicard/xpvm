@@ -36,7 +36,7 @@
 2b0d 0dba             # addd    0d <-- 0d + ba 
 210c 0c01             # addl    0c <-- 0c + 1
 5000 fff6             # jmp     CIO <-- CIO + (-9*4) 
-74ff c5ff             # ret     c5 
+74c5 ffff             # ret     c5 
 0000 0000             # unsigned number of exception handlers
 0000 0000             # unsigned outsymbol references
 0000 0000             # unsigned native function references

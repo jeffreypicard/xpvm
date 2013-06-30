@@ -20,7 +20,7 @@
 3003 0100                   # cvtld   r03 <-- r01 
 3004 0200                   # cvtld   r04 <-- r02 
 2b05 0304                   # addd    r05 <-- r03 + r04 
-74ff 05ff                   # ret     r05 
+7405 ffff                   # ret     r05 
 0000 0000                   # unsigned number of exception handlers
 0000 0000                   # unsigned outsymbol references
 0000 0000                   # unsigned native function references

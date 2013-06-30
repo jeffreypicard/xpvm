@@ -63,7 +63,7 @@
 # And back to doubles
 3005 05ff                   # cvtdl   r05 <-- r05 
 #
-74ff 05ff                   # ret     r05 
+7405 ffff                   # ret     r05 
 0000 0000                   # unsigned number of exception handlers
 0000 0000                   # unsigned outsymbol references
 0000 0000                   # unsigned native function references

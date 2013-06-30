@@ -16,11 +16,11 @@
 6110 1112             # alloc_blk r10, r11, r12 (alloc 16 bytes, store blk in r10) 
 63ff 10ff             # release_blk r10 
 1020 1001             # stb b(r10) + r01 <-- r20 
-74ff 01ff             # ret r01 
+7401 ffff             # ret r01 
 # Exception handler
 0e13 ffff             # ldimm r13 <-- $ffff (65536)
 3013 1300             # cvtld r13 <-- r13 
-74ff 13ff             # ret r13 
+7413 ffff             # ret r13 
 #
 0000 0001             # unsigned number of exception handlers
 0000 0000 

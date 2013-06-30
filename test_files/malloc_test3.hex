@@ -18,7 +18,7 @@
 62ff 10ff             # aquire_blk r10 
 1020 1001             # stb b(r10) + r01 <-- r20 
 7321 10ff             # calln r21, r10 (print_string with char* in r10)
-74ff 01ff             # ret r01 
+7401 ffff             # ret r01 
 #
 0000 0000             # unsigned number of exception handlers
 0000 0000             # unsigned outsymbol references

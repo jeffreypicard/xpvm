@@ -1098,7 +1098,7 @@ int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int ret_116( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t opcode, uint8_t c2, uint8_t rj, uint8_t c4 )
+            uint8_t opcode, uint8_t rj, uint8_t c3, uint8_t c4 )
 {
 #if TRACK_EXEC > 1
   fprintf( stderr, "\treg: %p\n", reg );

@@ -21,7 +21,7 @@
 1120 0102             # stb b(r01) + 00 <-- r20 
 7311 2101             # calln r11, r21, 01 (print_string with char* in r01, and 1 arg)
 3011 1100             # cvtld r11 <-- r11 
-74ff 11ff             # ret r11 
+7411 ffff             # ret r11 
 #
 0000 0000             # unsigned number of exception handlers
 0000 0000             # unsigned outsymbol references
