@@ -172,10 +172,10 @@ int process_exception( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 #define BLOCK_OWNER( b ) *(uint64_t*)(b - 8)
 #define BLOCK_CHAIN( b ) *(uint64_t*)(b - 16)
 #define BLOCK_ANNOTS( b ) *(uint64_t*)(b - 24)
-#define BLOCK_AUX_LENGTH( b ) *(uint32_t*)(b - 24)
-#define BLOCK_OUT_SYM_REFS( b ) *(uint32_t*)(b - 28)
+#define BLOCK_AUX_LENGTH( b ) *(uint32_t*)(b - 28)
+#define BLOCK_OUT_SYM_REFS( b ) *(uint32_t*)(b - 32)
 /* Pointer to allocated chunk of memory, or null */
-#define BLOCK_EXCEPT_HANDLERS( b ) *(uint64_t*)(b - 34)
+#define BLOCK_EXCEPT_HANDLERS( b ) *(uint64_t*)(b - 36)
 /* Pointer to allocated chunk of memory, or null */
 #define BLOCK_NATIVE_REFS( b ) *(uint64_t*)(b - 44)
 #define BLOCK_FRAME_SIZE( b ) *(uint32_t*)(b - 48)

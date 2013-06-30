@@ -53,7 +53,9 @@ test:
 	#./xpvm test_files/ret_42_local.obj
 	#./xpvm test_files/ret_42_call_local.obj
 	#./xpvm test_files/ret_42_malloc.obj
+	./test_files/hex_to_obj ./test_files/pi_threaded.hex ./test_files/pi_threaded.obj
 	./xpvm test_files/pi_threaded.obj
+	./test_files/hex_to_obj ./test_files/addd_test.hex ./test_files/addd_test.obj
 	./xpvm test_files/addd_test.obj
 	./test_files/hex_to_obj ./test_files/opcode_tests.hex ./test_files/opcode_tests.obj
 	./xpvm test_files/opcode_tests.obj

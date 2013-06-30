@@ -258,9 +258,9 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
   /* TODO Add this block to the VM memory. */
 
 #if DEBUG_XPVM
-  fprintf( stderr, "------- Block %d successfully "
+  fprintf( stderr, "------- Block %d (%p)successfully "
                    "read from object file. -------\n", 
-                   block_num );
+                   block_num, b_data_read );
 #endif
 
   return 1;  

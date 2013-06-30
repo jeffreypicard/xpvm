@@ -19,7 +19,7 @@
 91f0 a000             # join    id in f0, ret in a0 
 91f1 a100             # join    id in f1, ret in a1 
 2ba0 a0a1             # addd    a0 <-- a0 + a1 
-74ff a0ff             # ret     a0 
+74a0 ffff             # ret     a0 
 0000 0000             # unsigned number of exception handlers
 0000 0000             # unsigned outsymbol references
 0000 0000             # unsigned native function references

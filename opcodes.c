@@ -312,6 +312,9 @@ int ldblkid_28( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
                 uint8_t opcode, uint8_t ri, uint8_t c3, uint8_t c4 )
 {
   uint16_t const16 = TWO_8_TO_16( c3, c4 );
+#if TRACK_EXEC
+  fprintf( stderr, "\tldblkid: ri = %d, const16 = %d\n", ri, const16 );
+#endif
   /*FIXME: Check index against f_block count */
   uint8_t *b = (uint8_t*) CAST_INT 
                ((uint64_t*) CAST_INT reg[BLOCK_REG])[const16];
@@ -876,7 +879,7 @@ int aquire_blk_98( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 }
 
 int release_blk_99( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
-            uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
+            uint8_t opcode, uint8_t rj, uint8_t c3, uint8_t c4 )
 {
   uint8_t *b = (uint8_t*) reg[rj];
 
@@ -960,6 +963,7 @@ int call_114( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   uint8_t *b = (uint8_t*) CAST_INT reg[rj];
 #if TRACK_EXEC
   fprintf( stderr, "\tcall: b: %p\n", b );
+  fprintf( stderr, "\tblock annots: %x\n", BLOCK_ANNOTS(b) );
   fprintf( stderr, "INST_MASK: %lld\n", (uint64_t) INST_MASK );
 #endif
   CHECK_EXEC_ANNOTS( proc_id, b );
@@ -1104,6 +1108,8 @@ int ret_116( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   fprintf( stderr, "\treg: %p\n", reg );
   fprintf( stderr, "\tstack: %p\n", *stack );
 #endif
+  if ( !(*stack)->prev ) /* we are main */
+    (*stack)->ret_reg = rj;
   reg[(*stack)->ret_reg] = reg[rj];
   reg[PC_REG] = (*stack)->pc;
   reg[255] = (*stack)->reg255;

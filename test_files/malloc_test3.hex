@@ -14,7 +14,7 @@
 0e20 0061             # ldimm r20 <-- $0061 (97) 
 0e21 0001             # ldimm r21 <-- $0001 
 6010 1112             # alloc_blk r10, r11, r12 (alloc 16 bytes, store blk in r10) 
-63ff 10ff             # release_blk r10 
+6310 ffff             # release_blk r10 
 62ff 10ff             # aquire_blk r10 
 1020 1001             # stb b(r10) + r01 <-- r20 
 7321 10ff             # calln r21, r10 (print_string with char* in r10)
