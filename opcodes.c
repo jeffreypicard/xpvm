@@ -1013,7 +1013,7 @@ int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
                      uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4 );*/
   int (*fp)( void );
 #if TRACK_EXEC
-  fprintf( stderr, "name: %s\n", name );
+  //fprintf( stderr, "name: %s\n", name );
   fprintf( stderr, "num args: %d\n", const8 );
 #endif
 

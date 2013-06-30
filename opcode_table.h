@@ -16,6 +16,8 @@
  *    implementation of the opcode.
  */
 #define MAX_OPCODE_XPVM 150
+#define MIN_OPCODE_XPVM 2
+
 static struct opcode_info
 {
   char* opcode;
@@ -35,10 +37,10 @@ opcodes[] =
 {"ldi",                   0, ldi_7},       /* 7 */
 {"ldl",                   0, ldl_8},       /* 8 */
 {"ldl",                   0, ldl_9},       /* 9 */
-{"ldf",                   0, NULL}, /* 10 */
-{"ldf",                   0, NULL}, /* 11 */
-{"ldd",                   0, NULL}, /* 12 */
-{"ldd",                   0, NULL}, /* 13 */
+{"ldf",                   0, ldf_10}, /* 10 */
+{"ldf",                   0, ldf_11}, /* 11 */
+{"ldd",                   0, ldd_12}, /* 12 */
+{"ldd",                   0, ldd_13}, /* 13 */
 {"ldimm",                 0, ldimm_14},    /* 14 */
 {"ldimm2",                0, ldimm2_15},   /* 15 */
 {"stb",                   0, stb_16}, /* 16 */

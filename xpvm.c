@@ -472,10 +472,14 @@ static void *fetch_execute(void *v)
 #if TRACK_EXEC
     fprintf( stderr, "\topcode: %d\n", opcode );
 #endif
-    if (opcode > MAX_OPCODE_XPVM) // illegal instruction
+    if (opcode > MAX_OPCODE_XPVM || opcode < MIN_OPCODE_XPVM )
     {
       return  (void *) XPVM_ILLEGAL_INSTRUCTION;
     }
+
+    if (!opcodes[opcode].formatFunc )
+      EXIT_WITH_ERROR("Error: opcode %d not implemented or not valid\n", 
+                      opcode );
 
     int32_t ret = opcodes[opcode].formatFunc(pid, reg, &stack,
                                                  c1, c2, c3, c4 );

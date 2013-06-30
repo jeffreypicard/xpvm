@@ -463,6 +463,10 @@ int ldi_6                     OPCODE_FUNC
 int ldi_7                     OPCODE_FUNC
 int ldl_8                     OPCODE_FUNC
 int ldl_9                     OPCODE_FUNC
+int ldf_10                    OPCODE_FUNC
+int ldf_11                    OPCODE_FUNC
+int ldd_12                    OPCODE_FUNC
+int ldd_13                    OPCODE_FUNC
 int ldimm_14                  OPCODE_FUNC
 int ldimm2_15                 OPCODE_FUNC
 int stb_16                    OPCODE_FUNC
