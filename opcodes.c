@@ -387,6 +387,8 @@ int mull_37( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 int divl_38( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t rk )
 {
+  if( (long)reg[rk] == 0 )
+    return process_exception( proc_id, reg, stack, DIVIDE_BY_ZERO, 0);
   reg[ri] = (long)reg[rj] / (long)reg[rk];
   return 1;
 }
@@ -394,6 +396,8 @@ int divl_38( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 int divl_39( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t const8 )
 {
+  if( (long)const8 == 0 )
+    return process_exception( proc_id, reg, stack, DIVIDE_BY_ZERO, 0);
   reg[ri] = (long)reg[rj] / (long)const8;
   return 1;
 }
@@ -489,7 +493,7 @@ int divd_46( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   divisor  = *(double*) &reg[rk];
 
   if( divisor == 0. )
-    EXIT_WITH_ERROR("Divide by zero!!!!!!\n");
+    return process_exception( proc_id, reg, stack, DIVIDE_BY_ZERO, 0);
 
   quotient = dividend / divisor;
 #if TRACK_EXEC
