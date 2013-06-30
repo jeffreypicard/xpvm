@@ -201,6 +201,12 @@ int process_exception( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
         start_offset  = *handlers++;
         end_offset    = *handlers++;
         code_offset   = *handlers++;
+        fprintf( stderr, "EXCEPTION HANDLER!\n"
+                         "start: %x\n"
+                         "stop: %x\n"
+                         "code: %x\n"
+                         "CIO: %x\n",
+                         start_offset, end_offset, code_offset, CIO);
         if( start_offset <= CIO && end_offset >= CIO )
         {
           /* CIB is current block, CIO is the offset specified by the handler */

@@ -136,7 +136,7 @@ int ldimm_14( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   fprintf( stderr, "ldimm_14: const16: %d\n", const16 );
 #endif
 
-  reg[ri] = (uint64_t)const16;
+  reg[ri] = (uint64_t)*(int16_t*)&const16;
 
 #if TRACK_EXEC
   fprintf( stderr, "ldimm_14: reg[ri]: %lld\n", reg[ri] );
@@ -522,10 +522,10 @@ int cvtld_48( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
             uint8_t opcode, uint8_t ri, uint8_t rj, uint8_t c4 )
 {
   double d;
-  d = (double) reg[rj];
+  d = (double) *(int64_t*)&reg[rj];
   reg[ri] =  *(uint64_t*)&d;
 #if TRACK_EXEC
-  fprintf( stderr, "cvtld: reg[rj]: %d\n", reg[rj]);
+  fprintf( stderr, "cvtld: reg[rj]: %d\n", *(int64_t*)&reg[rj]);
   fprintf( stderr, "cvtld: reg[ri]: %f\n", *(double*)&reg[ri]);
 #endif
   return 1;

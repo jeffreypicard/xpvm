@@ -6,15 +6,18 @@
 0000 0000             # annotations, executable 
 0000 0002 
 0000 0000             # frame size
-0000 0034             # contents length
+0000 0040             # contents length
 1caa 0001             # ldblkid aa <-- blk[01]
 0e01 0000             # ldimm   01 <-- 0000 
 0e02 7fff             # ldimm   02 <-- 7FFF 
-0e03 ffff             # ldimm   03 <-- FFFF 
+0e03 0000             # ldimm   03 <-- 0000 
+0f03 ffff             # ldimm2  03 <-- FFFF 
 90f0 aa03             # doInitProc id in f0, func=01, args=2
 0e01 7fff             # ldimm   01 <-- 7FFF 
-0e02 ffff             # ldimm   02 <-- FFFF  
-0e03 ffff             # ldimm   03 <-- FFFF 
+0e02 0000             # ldimm   02 <-- 0000 
+0f02 ffff             # ldimm2  02 <-- FFFF  
+0e03 0000             # ldimm   03 <-- 0000 
+0f03 ffff             # ldimm2  03 <-- FFFF 
 90f1 aa03             # doInitProc id in f1, func=01, args=2
 91f0 a000             # join    id in f0, ret in a0 
 91f1 a100             # join    id in f1, ret in a1 
