@@ -36,3 +36,9 @@ int xpvm_printf( const char *format, ... )
   i = vprintf( format, ap );
   return i;
 }
+
+int print_double( uint64_t x )
+{
+  printf("%lf\n", *(double*)&x );
+  return 1;
+}
