@@ -64,13 +64,21 @@
  * This read a 32 bit integer from the object file INTO a little endian
  * 32 bit integer */
 #define READ_INT32_LITTLE_ENDIAN( var, fp ) do {      \
-  for( i = 0; i < 4; i++ )                            \
-    var |= ( CAST_INT fgetc(fp) << (32 - (i+1)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (32 - (1)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (32 - (2)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (32 - (3)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (32 - (4)*8) );  \
 } while(0)
 
 #define READ_INT64_LITTLE_ENDIAN( var, fp ) do {      \
-  for( i = 0; i < 8; i++ )                            \
-    var |= ( CAST_INT fgetc(fp) << (64 - (i+1)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (64 - (1)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (64 - (2)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (64 - (3)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (64 - (4)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (64 - (5)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (64 - (6)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (64 - (7)*8) );  \
+  var |= ( CAST_INT fgetc(fp) << (64 - (8)*8) );  \
 } while(0)
 
 #define TWO_8_TO_16( b1, b2 ) ((uint16_t)b1 << 8) | b2
