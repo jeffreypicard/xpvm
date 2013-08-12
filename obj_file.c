@@ -71,6 +71,9 @@ int32_t load_object_file( char *filename, int32_t *errorNumber, uint32_t* block_
   fprintf(stderr, "block_cnt: %d\n", *block_cnt );
 #endif
 
+  if (!(native_ref_patches = calloc(*block_cnt, sizeof *native_ref_patches )))
+    EXIT_WITH_ERROR("Error: malloc failed in load_object_file");
+
   /* Read the blocks into memory */
   for( i = 0; i < *block_cnt; i++ )
   {
@@ -203,14 +206,20 @@ int read_block( FILE *fp, int block_num, uint64_t *block_ptr )
   READ_INT32_LITTLE_ENDIAN( num_native_refs, fp );
 
 #if DEBUG_XPVM
-  fprintf( stderr, "num_outsymbol_refs: %08x\n", num_outsymbol_refs );
+  fprintf( stderr, "num_native_refs: %08x\n", num_native_refs );
 #endif
-
-  for( i = 0; i < num_outsymbol_refs; i++ )
+  native_ref_patches[block_num] = calloc( num_native_refs, 
+                                          sizeof **native_ref_patches );
+  for( i = 0; i < num_native_refs; i++ )
   {
-    /* Read until null */
-    while( fgetc(fp) );
+    j = 0;
+    while( (name[j] = fgetc( fp )) && ++j < MAX_NAME_LEN );
+    /* Name too long */
+    if( MAX_NAME_LEN <= j )
+      return 0;
     READ_INT32_LITTLE_ENDIAN( temp, fp );
+    native_ref_patches[block_num][i].offset = temp;
+    native_ref_patches[block_num][i].patch = get_native_func_ind( name );
   }
 
   /* Read length of auxiliary data */

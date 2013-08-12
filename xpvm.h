@@ -156,6 +156,15 @@ struct native_func_table {
 
 native_func_table *native_funcs;
 
+int get_native_func_ind( const char * );
+
+struct native_ref_patch {
+  uint64_t offset;
+  uint16_t patch;
+} typedef native_ref_patch;
+
+native_ref_patch **native_ref_patches;
+
 struct blk_list {
   uint64_t id;
   struct blk_list *next;
@@ -481,6 +490,7 @@ int stb_16                    OPCODE_FUNC
 int stb_17                    OPCODE_FUNC
 int sti_21                    OPCODE_FUNC
 int ldblkid_28                OPCODE_FUNC
+int ldnative_29               OPCODE_FUNC
 int addl_32                   OPCODE_FUNC
 int addl_33                   OPCODE_FUNC
 int subl_34                   OPCODE_FUNC

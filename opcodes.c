@@ -330,12 +330,18 @@ int ldnative_29( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
 {
   uint16_t const16 = TWO_8_TO_16( c3, c4 );
   /*FIXME: Check index against f_block count */
-  uint8_t *b = (uint8_t*) CAST_INT 
-               ((uint64_t*) CAST_INT reg[BLOCK_REG])[const16];
+  /*uint8_t *b = (uint8_t*) CAST_INT 
+               ((uint64_t*) CAST_INT reg[BLOCK_REG])[const16];*/
 #if TRACK_EXEC
   fprintf( stderr, "\tldnative: b: %p\n", b );
 #endif
-  reg[ri] = (uint64_t) CAST_INT b;
+
+#if CHECKS
+  if (const16 >= num_native_funcs)
+    EXIT_WITH_ERROR("Error: native function index out of bounds "
+                    "in ldnative_29\n");
+#endif
+  reg[ri] = (uint64_t) CAST_INT native_funcs[const16].fp;
   return 1;
 }
 
@@ -1028,7 +1034,8 @@ int calln_115( unsigned int proc_id, uint64_t *reg, stack_frame **stack,
   /*fp = (int (*)(void)) dlsym( __lh, name );
   if( (error = dlerror()) != NULL )
     EXIT_WITH_ERROR("Error: dlsym failed in calln_115\n");*/
-  fp = native_funcs[reg[rj]].fp;
+  //fp = native_funcs[reg[rj]].fp;
+  fp = (int (*)(void)) reg[rj];
   #if 1
   for( i = 0; i < const8 && i < 10; i++ )
   {

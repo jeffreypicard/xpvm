@@ -99,6 +99,48 @@ uint8_t *blk_2_ptr( uint8_t *b, int offset, uint64_t checks )
 }
 
 /*
+ * get_native_func_ind
+ *
+ * Takes a string and returns the index of the native function with that name.
+ * Returns -1 on failure.
+ */
+int get_native_func_ind( const char *name )
+{
+  int i = 0;
+  while ( i < num_native_funcs ) {
+    if ( !strcmp(name, native_funcs[i].name ) )
+      return i;
+    i++;
+  }
+  return -1;
+}
+
+/*
+ * patch_native_refs
+ *
+ * Takes an array of native ref patches and the number of patches.
+ * Applied the patches to the in memory function blocks.
+ */
+void patch_native_refs( native_ref_patch **native_ref_patches,
+                        uint64_t *block_ptr, uint32_t num_blocks )
+{
+  int i, j;
+  for ( i = 0; i < num_blocks; i++ ) {
+    for ( j = 0; j < BLOCK_NATIVE_REFS(block_ptr[i]); j++ ) {
+#if DEBUG_XPVM
+      fprintf( stderr, "PATCH: %d\n", native_ref_patches[i][j].patch );
+      fprintf( stderr, "OFFSET: %d\n", (int)native_ref_patches[i][j].offset );
+#endif
+      uint8_t *data = (uint8_t *) block_ptr[i];
+      uint8_t p1 = native_ref_patches[i][j].patch << 8;
+      uint8_t p2 = (uint8_t)(native_ref_patches[i][j].patch & 0xFF);
+      data[native_ref_patches[i][j].offset] = p1;
+      data[native_ref_patches[i][j].offset+1] = p2;
+    }
+  }
+}
+
+/*
  * load_native_funcs
  * 
  * This function loads the available native functions
@@ -114,6 +156,9 @@ int load_native_funcs( void )
   char c;
   int i, j;
   FILE *fp = fopen( NATIVE_FUNC_CFG_PATH, "r");
+  if ( !fp )
+    EXIT_WITH_ERROR("Error: Could not load native function config file "
+                    "in load_native_funcs.\n");
   /* Count number of functions */
   i = 0;
   fread( (void *) &c, 1, 1, fp );
@@ -561,6 +606,7 @@ int main( int argc, char **argv )
   if (!load_object_file(argv[1], &error_num, &block_cnt, &block_ptr))
     EXIT_WITH_ERROR("Error: load_object_file failed with error %d\n", error_num );
 
+  patch_native_refs( native_ref_patches, block_ptr, block_cnt );
   /* Add initial blocks to the global block list */
   blocks = NULL;
   for( i = 0; i < block_cnt; i++ )
@@ -583,7 +629,7 @@ int main( int argc, char **argv )
   /*r = (ret_struct*) (uint32_t) ret;*/
 
   /* For floats. */
-  fprintf( stderr, "r->ret_val: %1.8lf\n", *(double*)&(r->ret_val) );
+  /*fprintf( stderr, "r->ret_val: %1.8lf\n", *(double*)&(r->ret_val) );*/
   /*fprintf( stderr, "r->ret_val: %lld\n", (uint64_t)r->ret_val );*/
   /*fprintf( stderr, "r->status: %d\n", (int)r->status );*/
 
